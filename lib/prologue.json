@@ -1,0 +1,65 @@
+{
+  "voice": "George - Warm, Captivating Storyteller",
+  "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+  "model": "eleven_multilingual_v2",
+  "generated": "2026-09-08",
+  "tier": "free",
+  "license": "Noncommercial preview with ElevenLabs attribution",
+  "duration": 57.932,
+  "cues": [
+    {
+      "shot": "black",
+      "hold": 3,
+      "text": "From a distance, it looks almost still.",
+      "start": 0.0,
+      "speechStart": 1.0,
+      "speechEnd": 4.065,
+      "end": 7.065
+    },
+    {
+      "shot": "scale",
+      "hold": 4,
+      "text": "A hundred million suns. And somewhere beside them, two people trying to get home.",
+      "start": 7.065,
+      "speechStart": 8.065,
+      "speechEnd": 14.149,
+      "end": 18.149
+    },
+    {
+      "shot": "carrier",
+      "hold": 3,
+      "text": "Mara is aboard the carrier. You are in Vesper.",
+      "start": 18.149,
+      "speechStart": 19.149,
+      "speechEnd": 22.725,
+      "end": 25.725
+    },
+    {
+      "shot": "black",
+      "hold": 4,
+      "text": "There is one return seat.",
+      "start": 25.725,
+      "speechStart": 26.725,
+      "speechEnd": 29.047,
+      "end": 33.047
+    },
+    {
+      "shot": "probe",
+      "hold": 4,
+      "text": "Give it to her, and you take the descent. The distance between you will become something neither of you can cross.",
+      "start": 33.047,
+      "speechStart": 34.047,
+      "speechEnd": 41.013,
+      "end": 45.013
+    },
+    {
+      "shot": "cabin",
+      "hold": 5,
+      "text": "Your clock will keep counting. Your hands are still on the controls. Nothing happens until you let go.",
+      "start": 45.013,
+      "speechStart": 46.013,
+      "speechEnd": 52.932,
+      "end": 57.932
+    }
+  ]
+}

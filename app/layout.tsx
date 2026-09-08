@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Interstellar: Ad Astra',
+  title: 'Interstellar: Ad Astra · elevenlabs.io',
   description:
     'A cinematic probe descent powered by Kerr geodesics and local tidal physics.',
 };

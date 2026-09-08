@@ -1,7 +1,7 @@
 'use client';
 /* Static Vite deployment serves the original foreground asset without a Next image server. */
 /* oxlint-disable next/no-img-element */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createProbeRenderer, type Perspective } from '@/lib/probe';
 import { physicalScale, staticClockRate, clockDisplay } from '@/lib/mission';
 import {
@@ -10,7 +10,11 @@ import {
   flightCamera,
   type Flight,
 } from '@/lib/flight';
-import { MissionIntro } from './mission-intro';
+import {
+  MissionIntro,
+  type PrologueFrame,
+  type PrologueShot,
+} from './mission-intro';
 import { makeCamera } from '@/lib/camera';
 import { tidalStretch } from '@/lib/tides';
 import { Slider } from '@/components/ui/slider';
@@ -29,6 +33,15 @@ export default function Page() {
     probeCanvas = useRef<HTMLCanvasElement>(null);
   const [perspective, setPerspective] = useState<Perspective>('onboard'),
     [view, setView] = useState<View>(defaultView);
+  const introFrame = useRef<PrologueFrame | undefined>({
+    shot: 'title',
+    progress: 0,
+  });
+  const [introShot, setIntroShot] = useState<PrologueShot>('title');
+  const onIntroFrame = useCallback((frame: PrologueFrame) => {
+    if (introFrame.current?.shot !== frame.shot) setIntroShot(frame.shot);
+    introFrame.current = frame;
+  }, []);
   const [intro, setIntro] = useState(true),
     [cinematic, setCinematic] = useState(true);
   const [playing, setPlaying] = useState(false),
@@ -139,6 +152,7 @@ export default function Page() {
         probe!.render(
           mode.current === 'onboard' ? 'optics' : mode.current,
           separation,
+          introFrame.current,
         );
         if (now - lastTelemetry > 200) {
           setTelemetry({
@@ -187,7 +201,7 @@ export default function Page() {
     }));
   return (
     <main
-      className={`perspective-${intro ? 'wide' : perspective} flight-${phase} ${cinematic ? 'cinematic' : 'spectral'}`}
+      className={`perspective-${intro ? (introShot === 'cabin' ? 'onboard' : 'wide') : perspective} flight-${phase} ${cinematic ? 'cinematic' : 'spectral'} ${intro ? `in-prologue prologue-${introShot}` : ''}`}
     >
       <div className="universe">
         <canvas ref={canvas} aria-label="Live Kerr spacetime rendering" />
@@ -197,7 +211,8 @@ export default function Page() {
         className="probe-layer"
         aria-label="Exterior probe camera"
       />
-      {!intro && perspective === 'onboard' && (
+      {((intro && introShot === 'cabin') ||
+        (!intro && perspective === 'onboard')) && (
         <img
           className="cabin-art"
           src="/assets/cabin-v2.png"
@@ -387,15 +402,18 @@ export default function Page() {
           </section>
         )}
       </div>
-      {intro && (
-        <MissionIntro
-          onEnter={() => {
-            setIntro(false);
-            setPlaying(true);
-            reset.current++;
-          }}
-        />
-      )}
+      <MissionIntro
+        active={intro}
+        phase={phase}
+        playing={playing}
+        onFrame={onIntroFrame}
+        onEnter={() => {
+          introFrame.current = undefined;
+          setIntro(false);
+          setPlaying(true);
+          reset.current++;
+        }}
+      />
       {error && (
         <div role="alert" className="error">
           {error}

@@ -1,84 +1,154 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-const transmission = [
-  {
-    code: '01 / DESTINATION',
-    title: 'A hundred million suns.',
-    text: 'Vesper, this is flight control. The black hole fills your window. Your mission is to carry our instruments toward the horizon.',
-  },
-  {
-    code: '02 / THE RETURN',
-    title: 'Two crew. One return seat.',
-    text: 'Mara is waiting aboard the carrier. The return seat can be hers. You can take Vesper down, or call off the descent. The decision is yours.',
-  },
-  {
-    code: '03 / YOUR COMMAND',
-    title: 'Nothing releases without you.',
-    text: 'Enter the cabin. Arm the separation, then confirm release. The cameras at your lower right follow your descent. Your own clock stays with you.',
-  },
-];
-export function MissionIntro({ onEnter }: { onEnter: () => void }) {
-  const [page, setPage] = useState(-1),
-    [sound, setSound] = useState(true),
-    [voiceState, setVoiceState] = useState('');
-  const utterance = useRef<SpeechSynthesisUtterance | null>(null);
-  const speak = (index: number, enabled = sound) => {
-    if (!('speechSynthesis' in window)) {
-      setVoiceState('TEXT CHANNEL');
-      return;
-    }
-    window.speechSynthesis.cancel();
-    if (!enabled || index < 0) {
-      setVoiceState('TEXT CHANNEL');
-      return;
-    }
-    const line = transmission[index];
-    const speech = new SpeechSynthesisUtterance(`${line.title} ${line.text}`);
-    const voices = window.speechSynthesis.getVoices();
-    speech.voice =
-      voices.find((v) => v.localService && /^en-GB/i.test(v.lang)) ??
-      voices.find((v) => v.localService && /^en/i.test(v.lang)) ??
-      null;
-    speech.rate = 0.86;
-    speech.pitch = 0.86;
-    speech.volume = 0.85;
-    speech.onstart = () => setVoiceState('VOICE CHANNEL');
-    speech.onend = () => setVoiceState('TRANSMISSION COMPLETE');
-    speech.onerror = () => setVoiceState('TEXT CHANNEL');
-    utterance.current = speech;
-    window.speechSynthesis.speak(speech);
-  };
-  useEffect(
-    () => () => {
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    },
-    [],
+import prologue from '@/lib/prologue.json';
+import { MissionSound } from '@/lib/mission-sound';
+export type PrologueShot =
+  | 'title'
+  | 'black'
+  | 'scale'
+  | 'carrier'
+  | 'probe'
+  | 'cabin';
+export type PrologueFrame = { shot: PrologueShot; progress: number };
+export function MissionIntro({
+  active,
+  phase,
+  playing,
+  onEnter,
+  onFrame,
+}: {
+  active: boolean;
+  phase: string;
+  playing: boolean;
+  onEnter: () => void;
+  onFrame: (frame: PrologueFrame) => void;
+}) {
+  const [begun, setBegun] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [voice, setVoice] = useState(true);
+  const [music, setMusic] = useState(true);
+  const [elapsed, setElapsed] = useState(0);
+  const [audioError, setAudioError] = useState('');
+  const sound = useRef<MissionSound | null>(null);
+  const reducedMotion = useRef(false);
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => {
+      reducedMotion.current = query.matches;
+    };
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  const subtitle = useRef<HTMLParagraphElement>(null);
+  const ready = elapsed >= prologue.duration - 0.15;
+  const index = Math.max(
+    0,
+    prologue.cues.findIndex((cue) => elapsed < cue.end),
   );
-  const advance = () => {
-    const next = page + 1;
-    setPage(next);
-    speak(next);
+  const cue = prologue.cues[ready ? prologue.cues.length - 1 : index];
+  const start = () => {
+    if (!sound.current) sound.current = new MissionSound();
+    sound.current.voiceEnabled = voice;
+    sound.current.musicEnabled = music;
+    sound.current.start();
+    setBegun(true);
   };
   const enter = () => {
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    start();
+    sound.current?.enter();
     onEnter();
   };
+  useEffect(() => () => sound.current?.dispose(), []);
+  useEffect(() => {
+    sound.current?.setPhase(phase);
+  }, [phase]);
+  useEffect(() => {
+    const pause = () =>
+      sound.current?.pause(document.hidden || (active ? paused : !playing));
+    pause();
+    document.addEventListener('visibilitychange', pause);
+    return () => document.removeEventListener('visibilitychange', pause);
+  }, [active, paused, playing, begun]);
+  useEffect(() => {
+    if (!begun) return;
+    let id = 0;
+    let lastUi = 0;
+    const tick = (now: number) => {
+      const seconds = Math.min(sound.current?.time ?? 0, prologue.duration);
+      const current =
+        prologue.cues.find((c) => seconds < c.end) ?? prologue.cues.at(-1)!;
+      const progress = Math.min(
+        1,
+        (seconds - current.start) / (current.end - current.start),
+      );
+      if (active)
+        onFrame({
+          shot: current.shot as PrologueShot,
+          progress: reducedMotion.current ? 0 : progress,
+        });
+      sound.current?.duckVoice(
+        active &&
+          seconds >= current.speechStart - 0.3 &&
+          seconds < current.speechEnd + 0.4,
+      );
+      if (subtitle.current) {
+        const reveal = Math.max(
+          0,
+          Math.floor((seconds - current.speechStart) * 24),
+        );
+        subtitle.current.textContent =
+          current.shot === 'black' && !reducedMotion.current
+            ? current.text.slice(0, reveal)
+            : current.text;
+      }
+      if (now - lastUi > 100) {
+        setElapsed(seconds);
+        setAudioError([...(sound.current?.failed ?? [])].join(', '));
+        lastUi = now;
+      }
+      id = requestAnimationFrame(tick);
+    };
+    id = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(id);
+  }, [begun, active, onFrame]);
+  const toggleVoice = () => {
+    if (sound.current) sound.current.voiceEnabled = !voice;
+    setVoice(!voice);
+  };
+  const toggleMusic = () => {
+    if (sound.current) sound.current.musicEnabled = !music;
+    setMusic(!music);
+  };
+  if (!active)
+    return (
+      <div className="mission-audio-controls">
+        <button aria-pressed={music} onClick={toggleMusic}>
+          SCORE {music ? 'ON' : 'OFF'}
+        </button>
+        <a href="/credits.html" target="_blank" rel="noreferrer">
+          CREDITS
+        </a>
+        {audioError && (
+          <button onClick={() => sound.current?.retry()}>RETRY AUDIO</button>
+        )}
+      </div>
+    );
   return (
     <section
-      className={`mission-intro ${page < 0 ? 'title-sequence' : 'transmission-sequence'}`}
+      className={`mission-intro ${!begun ? 'title-sequence' : `film-sequence shot-${cue.shot}`} ${ready ? 'handoff' : ''}`}
       aria-label="Mission entrance"
     >
       <div className="intro-meta">
         <span>VESPER / FLIGHT ARCHIVE</span>
-        <span>08.09.26</span>
+        <span>CHAPTER I</span>
       </div>
-      {page < 0 ? (
+      {!begun ? (
         <div className="title-lockup">
-          <p className="intro-kicker">A JOURNEY TO THE EDGE OF WHAT WE KNOW</p>
           <h1>
             interstellar<span>: ad astra</span>
           </h1>
-          <button className="intro-primary" onClick={advance}>
+          <button className="intro-primary" onClick={start}>
             BEGIN TRANSMISSION <span>↗</span>
           </button>
           <button className="intro-skip" onClick={enter}>
@@ -86,40 +156,55 @@ export function MissionIntro({ onEnter }: { onEnter: () => void }) {
           </button>
         </div>
       ) : (
-        <div className="transmission-card" key={page}>
-          <div className="transmission-code">
-            <span className="signal-light" />
-            {transmission[page].code}
+        <>
+          <div className="film-letterbox" aria-hidden="true" />
+          <div className="film-caption" key={cue.start}>
+            {cue.shot === 'black' && (
+              <span className="film-cue-number">
+                {String(index + 1).padStart(2, '0')} / TRANSMISSION
+              </span>
+            )}
+            <p ref={subtitle} aria-hidden="true" />
+            <span className="sr-only" aria-live="polite">
+              {cue.text}
+            </span>
           </div>
-          <h2>{transmission[page].title}</h2>
-          <p>{transmission[page].text}</p>
-          <div className="transmission-status">
-            {voiceState || 'TEXT + VOICE'}
+          {ready && (
+            <button className="intro-primary enter-vesper" onClick={enter}>
+              ENTER VESPER <span>↗</span>
+            </button>
+          )}
+          <div className="film-transport">
+            <button aria-pressed={paused} onClick={() => setPaused(!paused)}>
+              {paused ? 'RESUME' : 'PAUSE'}
+            </button>
+            <button onClick={enter}>SKIP TO CABIN ↗</button>
           </div>
-          <button
-            className="intro-primary"
-            onClick={page === transmission.length - 1 ? enter : advance}
-          >
-            {page === transmission.length - 1 ? 'ENTER VESPER' : 'CONTINUE'}{' '}
-            <span>↗</span>
-          </button>
-          <button className="intro-skip" onClick={enter}>
-            SKIP TO CABIN
-          </button>
-        </div>
+          <div className="film-progress" aria-hidden="true">
+            <i
+              style={{ transform: `scaleX(${elapsed / prologue.duration})` }}
+            />
+          </div>
+        </>
       )}
       <footer className="intro-footer">
-        <span>CHAPTER I / THE RELEASE</span>
-        <button
-          aria-pressed={sound}
-          onClick={() => {
-            setSound(!sound);
-            speak(page, !sound);
-          }}
-        >
-          VOICE {sound ? 'ON' : 'OFF'}
-        </button>
+        <a href="/credits.html" target="_blank" rel="noreferrer">
+          SOUND / elevenlabs.io · SCOTT BUCKLEY
+        </a>
+        <div>
+          <button aria-pressed={voice} onClick={toggleVoice}>
+            VOICE {voice ? 'ON' : 'OFF'}
+          </button>
+          <button aria-pressed={music} onClick={toggleMusic}>
+            SCORE {music ? 'ON' : 'OFF'}
+          </button>
+        </div>
       </footer>
+      {audioError && (
+        <button className="audio-retry" onClick={() => sound.current?.retry()}>
+          RETRY AUDIO / {audioError}
+        </button>
+      )}
     </section>
   );
 }

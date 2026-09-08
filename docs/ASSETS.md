@@ -17,3 +17,11 @@ NASA's [media usage guidelines](https://www.nasa.gov/nasa-brand-center/images-an
 ## Ad Astra spacecraft revision
 
 The current game combines the NASA Apollo capsule from the preserved checkpoint with an original twelve-module ring carrier (`lib/vessels.ts`). The supplied silhouette and film references inform the carrier shape and palette. No film models, textures, dialogue, score or footage are bundled. The Apollo capsule remains a detailed stand-in, not a reproduction of the film’s Ranger. The Soyuz part of the NASA asset is not displayed in this version.
+
+## Narration and score revision
+
+Original narration: stock **George** voice from **elevenlabs.io**, generated with Eleven Multilingual v2. This account was on the free tier at generation: noncommercial preview only, with title attribution; regenerate under an appropriate paid plan for commercial use. No Morgan Freeman voice or actor clone is used.
+
+“Signal to Noise” (No Piano Melody mix) and “Titan” by **Scott Buckley**, released under **CC BY 4.0**. Music excerpts were faded, level-adjusted and transcoded; full source links, edit details and demo-video attribution are in [audio licenses](../public/assets/audio/LICENSES.md). The public credits page is `/credits.html`.
+
+The user-requested YouTube download, extracted soundtrack and contact sheets are private analysis files outside the repository. The game uses live graphics and licensed replacement music; it does not contain that film's pixels, dialogue or score.

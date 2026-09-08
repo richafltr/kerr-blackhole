@@ -1,0 +1,40 @@
+{
+  "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+  "voice_name": "George - Warm, Captivating Storyteller",
+  "model_id": "eleven_multilingual_v2",
+  "voice_settings": {
+    "stability": 0.63,
+    "similarity_boost": 0.78,
+    "style": 0.18,
+    "speed": 0.88,
+    "use_speaker_boost": true
+  },
+  "cues": [
+    {
+      "shot": "black",
+      "hold": 3,
+      "text": "From a distance, it looks almost still."
+    },
+    {
+      "shot": "scale",
+      "hold": 4,
+      "text": "A hundred million suns. And somewhere beside them, two people trying to get home."
+    },
+    {
+      "shot": "carrier",
+      "hold": 3,
+      "text": "Mara is aboard the carrier. You are in Vesper."
+    },
+    { "shot": "black", "hold": 4, "text": "There is one return seat." },
+    {
+      "shot": "probe",
+      "hold": 4,
+      "text": "Give it to her, and you take the descent. The distance between you will become something neither of you can cross."
+    },
+    {
+      "shot": "cabin",
+      "hold": 5,
+      "text": "Your clock will keep counting. Your hands are still on the controls. Nothing happens until you let go."
+    }
+  ]
+}

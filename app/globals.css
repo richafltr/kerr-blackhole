@@ -855,3 +855,229 @@ button.intro-skip {
     animation: none;
   }
 }
+
+/* The prologue edits a cached optical frame; it does not retrace Kerr rays for a camera pan. */
+.in-prologue {
+  --shot-progress: 0;
+  background: #000;
+}
+.in-prologue .universe {
+  transform-origin: 68% 46%;
+}
+.prologue-title .universe,
+.prologue-scale .universe {
+  transform: translate(26%, -3%) scale(1.48) rotate(-8deg);
+}
+.prologue-carrier .universe {
+  transform: translate(30%, 5%) scale(1.7) rotate(-13deg);
+}
+.prologue-probe .universe {
+  transform: translate(18%, 3%) scale(1.35) rotate(-5deg);
+}
+.prologue-black .universe,
+.prologue-black .probe-layer {
+  visibility: hidden;
+}
+.in-prologue:not(.prologue-black) .probe-layer {
+  animation: film-reveal 1.3s ease both;
+}
+.mission-intro.title-sequence {
+  background: linear-gradient(0deg, #000d, #0000 55%, #0006);
+}
+.title-sequence .title-lockup {
+  top: 42%;
+}
+.title-sequence .title-lockup h1 {
+  font-size: clamp(30px, 5.8vw, 84px);
+  font-weight: 200;
+}
+.mission-intro.film-sequence {
+  background: transparent;
+}
+.film-sequence.shot-black {
+  background: #000;
+}
+.film-letterbox {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-top: 8vh solid #000;
+  border-bottom: 8vh solid #000;
+}
+.film-caption {
+  position: absolute;
+  bottom: 16%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(690px, 80%);
+  text-align: center;
+  animation: film-reveal 1.4s ease both;
+}
+.film-caption p {
+  margin: 0;
+  font:
+    400 clamp(15px, 1.5vw, 20px)/1.8 'Courier New',
+    monospace;
+  color: #e9e5dd;
+  text-shadow:
+    0 2px 5px #000,
+    0 0 18px #000;
+  text-wrap: balance;
+}
+.shot-black .film-caption {
+  bottom: auto;
+  top: 43%;
+}
+.shot-black .film-caption p {
+  font-size: clamp(18px, 2.2vw, 30px);
+  letter-spacing: 0.04em;
+  min-height: 3em;
+}
+.film-cue-number {
+  display: block;
+  font: 10px monospace;
+  letter-spacing: 0.3em;
+  color: #847e72;
+  margin-bottom: 35px;
+}
+.film-transport {
+  position: absolute;
+  top: 11%;
+  right: 4%;
+  display: flex;
+  gap: 24px;
+}
+.film-transport button,
+.intro-footer button,
+.mission-audio-controls button {
+  width: auto;
+  height: auto;
+  min-height: 32px;
+  padding: 5px 0;
+  color: #b8b4a9;
+  font: 11px monospace;
+  letter-spacing: 0.12em;
+  background: transparent;
+  border: 0;
+}
+.intro-footer a {
+  color: #9f998c;
+  text-decoration: none;
+  font: 10px monospace;
+  letter-spacing: 0.08em;
+}
+.intro-footer > div {
+  display: flex;
+  gap: 24px;
+}
+.film-progress {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 8%;
+  height: 1px;
+  background: #ece3d319;
+}
+.film-progress i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  background: #c3b69a;
+}
+.enter-vesper {
+  position: absolute;
+  top: 68%;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: film-reveal 1s ease both;
+}
+.handoff .film-caption {
+  animation: none;
+  opacity: 0;
+  transition: opacity 1s;
+}
+.mission-audio-controls {
+  position: absolute;
+  z-index: 15;
+  bottom: 65px;
+  left: 26px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.mission-audio-controls a {
+  font: 9px monospace;
+  letter-spacing: 0.1em;
+  color: #b0a58e;
+  text-decoration: none;
+}
+.audio-retry {
+  position: absolute;
+  z-index: 45;
+  bottom: 12%;
+  left: 4%;
+  width: auto;
+  height: auto;
+  color: #ebd5ad;
+  background: #100f0e;
+  border: 1px solid #776850;
+  padding: 10px;
+  font: 11px monospace;
+}
+@keyframes film-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 800px) {
+  .intro-footer {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .intro-footer a {
+    font-size: 9px;
+  }
+  .film-caption {
+    bottom: 23%;
+    width: 86%;
+  }
+  .film-caption p {
+    font-size: 15px;
+  }
+  .film-transport {
+    top: 10%;
+    gap: 18px;
+  }
+  .film-cue-number {
+    font-size: 9px;
+  }
+  .title-sequence .title-lockup {
+    top: 38%;
+  }
+  .mission-audio-controls {
+    bottom: 66px;
+    left: 16px;
+  }
+  .mission-audio-controls button {
+    font-size: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .film-caption,
+  .in-prologue .probe-layer,
+  .enter-vesper {
+    animation: none;
+  }
+}
+
+.film-sequence .intro-footer {
+  bottom: 2%;
+}
+.film-sequence .intro-meta {
+  top: 3%;
+}

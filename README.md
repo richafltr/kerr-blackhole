@@ -10,7 +10,19 @@ The current build uses **WebGL2**, with direct GLSL for general-relativistic lig
 
 ## Current extension
 
-A cinematic entrance, three voiced mission transmissions, a deliberate crew-seat/release decision, and warm Cinema/Spectral color selection. A new float64 Kerr curvature calculation projects the tidal tensor into the traveler’s frame and displays the stretching differential acceleration across 2 m. Thirty CPU tests now pass, including Schwarzschild tidal eigenvalues, Kerr vacuum/symmetry checks and finite-difference convergence. The crew story is fictional; remote signal transport, hull breakup and interior flight are pending the gates in [descent research](docs/DESCENT_RESEARCH.md).
+A 58-second cinematic prologue now alternates black typewriter cards, a tiny carrier against the live black hole, spacecraft close passes and the pilot cabin. Original ElevenLabs narration (stock George voice) is synchronized to the shot sequence. Scott Buckley’s CC BY 4.0 score ducks beneath speech and changes when the player chooses release. Independent voice/score controls, pause, skip and reduced-motion handling keep the sequence usable. [Film study, editorial decisions and verification](docs/FILM_DIRECTION.md).
+
+The narration is a **noncommercial preview generated on ElevenLabs’ free tier**, credited to **elevenlabs.io**. Music and voice have separate terms from the source code; see [audio licenses](public/assets/audio/LICENSES.md) before reusing or submitting a recorded demo. No film media are shipped.
+
+The deliberate crew-seat/release decision and warm Cinema/Spectral color selection remain. A new float64 Kerr curvature calculation projects the tidal tensor into the traveler’s frame and displays the stretching differential acceleration across 2 m. Thirty CPU tests now pass, including Schwarzschild tidal eigenvalues, Kerr vacuum/symmetry checks and finite-difference convergence. The crew story is fictional; remote signal transport, hull breakup and interior flight are pending the gates in [descent research](docs/DESCENT_RESEARCH.md).
+
+## Preserved Ad Astra checkpoint
+
+**`baseline-ad-astra-v1` at `ccfab07`** preserves the working cabin, NASA capsule, segmented ring carrier, original entrance and 30-test Kerr/tidal baseline before the cinematic audio revision. The current extension adds approximately 4.14 MB of static audio and lightweight shot staging; it leaves the numerical kernel and descent equations unchanged.
+
+```sh
+git worktree add --detach ../kerr-ad-astra-baseline baseline-ad-astra-v1
+```
 
 ## Preserved cabin and free-fall checkpoint
 
@@ -88,7 +100,7 @@ Stationary rays have at most 900 RK4 steps; moving-observer rays use half-sized 
 
 ## Verification
 
-Run `npm test`, `npm run typecheck`, `npx oxlint app lib tests client vite.vercel.config.ts`, and `npm run build:vercel`. Thirty CPU tests cover the reference equations, tetrad, ISCO, conservation, convergence, physical units, static clocks, and probe angular size. Open `/?validate=1` to run actual GPU/reference comparisons and cache checks; it is a diagnostic page, absent from the normal interface.
+Run `npm test`, `npm run typecheck`, `npx oxlint app lib tests client vite.vercel.config.ts`, and `npm run build:vercel`. Thirty CPU physics tests cover the reference equations, tetrad, ISCO, conservation, convergence, physical units, static clocks, and probe angular size. Four additional audio-controller tests cover pause/skip, release, mute and playback failures. Open `/?validate=1` to run actual GPU/reference comparisons and cache checks; it is a diagnostic page, absent from the normal interface.
 
 On the recorded browser run, all 140 sampled Kerr rays agreed in classification, with maximum disk-hit discrepancy `1.473e-5 M`. See [validation results and limitations](docs/VALIDATION.md), rather than interpreting these selected-ray checks as a global accuracy guarantee.
 

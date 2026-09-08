@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createVessels } from './vessels';
+export type CinematicFrame = {
+  shot: 'title' | 'black' | 'scale' | 'carrier' | 'probe' | 'cabin';
+  progress: number;
+};
 export type Perspective = 'onboard' | 'beside' | 'wide' | 'optics';
 export function createProbeRenderer(canvas: HTMLCanvasElement) {
   const renderer = new THREE.WebGLRenderer({
@@ -86,7 +90,7 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
   let width = 0,
     height = 0;
   return {
-    render(mode: Perspective, separationM = 0) {
+    render(mode: Perspective, separationM = 0, cinematic?: CinematicFrame) {
       if (assetError)
         throw new Error(
           'Spacecraft asset could not be loaded. Reload to retry.',
@@ -119,6 +123,27 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
         wide ? -800 : -500 - Math.min(separationM, 1000),
       );
       vessels.carrier.rotation.set(0.24, -0.35, 0.3);
+      if (cinematic) {
+        const { shot, progress: p } = cinematic;
+        if (shot === 'black' || shot === 'cabin') return;
+        // Editorial staging of nearby meshes; this is not a simulated camera worldline.
+        camera.position.set(0, 0, 180);
+        camera.lookAt(0, 0, 0);
+        capsule.visible = shot === 'probe' && loaded;
+        vessels.carrier.visible = true;
+        vessels.carrier.position.set(-200 + p * 7, 65 - p * 2, -850);
+        vessels.carrier.rotation.set(0.28, -0.4, 0.3 + p * 0.04);
+        if (shot === 'carrier') {
+          vessels.carrier.position.set(-35 + p * 4, 4, -35 - p * 16);
+          vessels.carrier.rotation.set(0.4, -0.5, 0.38 + p * 0.07);
+        } else if (shot === 'probe') {
+          camera.position.set(0, 3, 48 + p * 3);
+          camera.lookAt(0, 0, 0);
+          capsule.position.set(-8 + p * 0.8, -1, 0);
+          capsule.rotation.set(0.2, -0.4 + p * 0.06, -0.35);
+          vessels.carrier.position.set(-35, 85, -450);
+        }
+      }
       renderer.render(scene, camera);
     },
     dispose() {

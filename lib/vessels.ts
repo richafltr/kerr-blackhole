@@ -21,6 +21,16 @@ export function createVessels() {
     emissive: 0xe1aa57,
     emissiveIntensity: 1.5,
   });
+  const engine = new THREE.MeshStandardMaterial({
+    color: 0x273238,
+    metalness: 0.75,
+    roughness: 0.4,
+  });
+  const throat = new THREE.MeshStandardMaterial({
+    color: 0x081219,
+    emissive: 0x69b9e8,
+    emissiveIntensity: 0.45,
+  });
   const geometries: THREE.BufferGeometry[] = [];
   const mesh = (
     parent: THREE.Object3D,
@@ -63,7 +73,36 @@ export function createVessels() {
     for (let j = 0; j < 4; j++)
       box(habitat, 2.8, 0.12, 0.14, shadow, 0, -1.5 + j, 2.65);
     box(habitat, 0.2, 0.55, 0.15, lamp, 1.9, 0, 2.65);
+    // Recessed radiators, service rails and four engine bells on alternate drive modules.
+    box(habitat, 0.16, 5.6, 0.2, metal, -2.5, 0, 2.6);
+    box(habitat, 0.16, 5.6, 0.2, metal, 2.5, 0, 2.6);
+    for (let rib = 0; rib < 6; rib++) {
+      box(habitat, 0.15, 4.2, 0.2, hull, -1.65 + rib * 0.65, 0, -2.6);
+    }
     if (i % 3 === 0) {
+      box(habitat, 4.6, 5, 0.2, shadow, 0, 0, 2.8);
+      for (const x of [-1.05, 1.05])
+        for (const y of [-1.2, 1.2]) {
+          const bell = mesh(
+            habitat,
+            new THREE.CylinderGeometry(0.94, 0.53, 1.1, 16, 1, true),
+            engine,
+            x,
+            y,
+            3.35,
+          );
+          bell.rotation.x = Math.PI / 2;
+          mesh(
+            habitat,
+            new THREE.TorusGeometry(0.94, 0.08, 6, 16),
+            metal,
+            x,
+            y,
+            3.9,
+          );
+          mesh(habitat, new THREE.CircleGeometry(0.64, 16), throat, x, y, 2.92);
+        }
+
       const spoke = box(
         carrier,
         23,
@@ -83,7 +122,7 @@ export function createVessels() {
     carrier,
     dispose() {
       geometries.forEach((g) => g.dispose());
-      [hull, shadow, metal, lamp].forEach((m) => m.dispose());
+      [hull, shadow, metal, lamp, engine, throat].forEach((m) => m.dispose());
     },
   };
 }
