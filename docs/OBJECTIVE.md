@@ -19,7 +19,7 @@ The desired technical achievement is an accessible renderer whose numerical outp
 | Disk | Thin opaque annulus; procedural illustrative emission | Covariant frequency shift and documented emitter velocity model |
 | Accuracy | Selected float64 analytic-limit and convergence tests | GPU capture/escape, disk-hit, null-constraint and convergence measurements |
 | Performance | Capped internal resolution; no validated timing claim | Median/p95 GPU time, step distributions, unresolved fraction, memory footprint |
-| Distribution | Browser preview | Public Vercel static build; zero server-side GPU inference/rendering cost |
+| Distribution | Public Vercel static build | Validate on additional lower-resource devices; no server-side GPU rendering |
 
 ## What would qualify as a technical feat
 

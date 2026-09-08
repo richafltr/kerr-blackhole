@@ -1,5 +1,7 @@
 # Kerr Black Hole
 
+**Public simulation:** https://kerr-blackhole.vercel.app
+
 Make general-relativistic simulation accessible on ordinary consumer hardware, without server GPU costs. The first application is a full-screen black-hole renderer inspired by Interstellar. The interface contains only pause, camera controls, and reset. Explanatory material is intentionally absent.
 
 The committed [objective](docs/OBJECTIVE.md) separates achieved capabilities from targets. The [technical plan](docs/TECHNICAL_PLAN.md) specifies the Hamiltonian equations, kernel costs, precision, memory, divergence, validation, and performance gates.
