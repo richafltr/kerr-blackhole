@@ -1,6 +1,8 @@
 # Kerr Black Hole
 
-A full-screen GPU black-hole renderer inspired by Interstellar. The interface contains only pause, camera controls, and reset. Explanatory and teaching material is intentionally absent from the experience.
+Make general-relativistic simulation accessible on ordinary consumer hardware, without server GPU costs. The first application is a full-screen black-hole renderer inspired by Interstellar. The interface contains only pause, camera controls, and reset. Explanatory material is intentionally absent.
+
+The committed [objective](docs/OBJECTIVE.md) separates achieved capabilities from targets. The [technical plan](docs/TECHNICAL_PLAN.md) specifies the Hamiltonian equations, kernel costs, precision, memory, divergence, validation, and performance gates.
 
 **Current physics: Schwarzschild, not Kerr.** Each pixel traces a null geodesic through a nonrotating black-hole spacetime and samples a thin accretion disk or distant procedural star field. The dark shadow and disk lensing emerge from light propagation. Disk emission, texture, rotation animation, exposure, and vignette are illustrative presentation models. This is not an accretion-fluid simulation or a reproduction of the film's renderer.
 
@@ -10,23 +12,23 @@ Node 22.13+ and npm; developed using Node 25.4.0.
 
 ```sh
 npm ci
-npm run dev
+npm run dev:vercel
 npm test
 npm run typecheck
-npm run build
+npm run build:vercel
 ```
 
-Open the local URL printed by the server. WebGL2 and hardware acceleration are required. The page updates through the running development server.
+Open the local URL printed by the server. WebGL2 and hardware acceleration are required. The Vercel target is a static Vite/React build with no server-side runtime or secrets. `vercel.json` configures the build and output; `npx vercel --prod` deploys after Vercel login. The original Sites scripts (`dev`, `build`, `start`) remain available separately.
 
 ## Stack and why
 
 | Layer | Choice | Purpose |
 | --- | --- | --- |
 | GPU image | Direct WebGL2 / GLSL ES 3.00 | Full-screen per-pixel numerical light tracing. |
-| Reference physics | TypeScript / JavaScript float64 | Analytic-limit and integration checks. |
+| Reference physics | TypeScript / JavaScript float64 | Schwarzschild checks plus Kerr–Schild Hamiltonian solver with automatic metric derivatives. |
 | Interface | React + TypeScript | Minimal, hidden-by-default camera controls, outside the render loop. |
-| Build | Vinext / Vite, npm lockfile | Existing scaffold and reproducible build. |
-| Preview | Sites | Distribution only; the viewer's device renders the image. |
+| Public build | Static Vite/React, npm lockfile | Vercel CDN; no request-time server or GPU bill. |
+| Alternate build | Vinext / Sites | Retained existing preview target. |
 
 This stack minimizes implementation overhead for the current sprint. It is not a measured claim that WebGL2 outperforms WebGPU. Three.js is optional scene plumbing, not a relativity solver; a single full-screen pass does not need it.
 
@@ -58,13 +60,21 @@ Near-critical rays that exhaust the step budget render dark; they are not proven
 
 Internal resolution is capped to a 1,100-pixel longest edge, multiplied by the resolution control (default 0.7). This is an explicit quality/performance tradeoff. No FPS or speedup claim has been measured for this renderer.
 
+## Kerr reference milestone
+
+`lib/kerr.ts` implements a float64 Hamiltonian null-geodesic solver in Cartesian ingoing Kerr–Schild coordinates (signature −,+,+,+, spin axis z). Forward-mode automatic differentiation computes the spatial derivatives of the metric field without finite-difference gradients in the integrator. `p_t` is conserved by the stationary system; the solver integrates position and spatial covariant momentum using RK4.
+
+Tests cover the analytic a=0 inverse metric, derivatives checked by independent central differences, null initialization, null and axial-angular-momentum conservation, radial capture, spin-reflection symmetry, and fourth-order step refinement. For the documented a=0.7 escaping test ray, maximum normalized Hamiltonian residual is about `2.77e-11` and relative axial-angular-momentum drift `4.45e-12`. These apply to that float64 test trajectory, not the GPU image or all Kerr conditions.
+
+This solver is a validation foundation, not yet a GPU kernel. Its coordinate-momentum initializer is not a camera tetrad. A physically calibrated Kerr camera, emitter model, GPU implementation, and GPU/reference comparisons remain required before advertising Kerr imagery. No black-hole interior or evolving Einstein-equation solve is implemented.
+
 ## Checks
 
 `tests/light.test.ts` checks capture/escape on either side of analytic `bcrit = 3√3 M`, the photon sphere fixed orbit at `r = 3 M`, the null-orbit invariant, and step refinement for an escaping ray.
 
 Float64 reference at impact parameter `b = 6 M`: maximum relative invariant drift about `7.61e-11` at step 0.012. Escaping direction agrees within `1e-5` radians when the step is halved. These are CPU reference checks, not GPU error bounds.
 
-The previous timelike-orbit reference and its four tests remain in `lib/physics.ts` and `tests/physics.test.ts`; they are not displayed in the interface. Seven physics tests, TypeScript, authored-code lint, and the production build pass. Automated browser interaction/visual QA and a GPU timing benchmark have not been performed.
+The previous timelike-orbit reference and its four tests remain in `lib/physics.ts` and `tests/physics.test.ts`; they are not displayed in the interface. Fourteen physics tests, TypeScript, authored-code lint, and the static production build pass. Automated browser interaction/visual QA and a GPU timing benchmark have not been performed.
 
 The generated scaffold has pre-existing lint issues in unused UI components/hooks and 11 npm audit advisories (8 high), not remediated in this prototype.
 
