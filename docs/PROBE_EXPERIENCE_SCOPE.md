@@ -1,6 +1,6 @@
 # From a black-hole image to a probe experience
 
-Status: scoped on 8 September 2026; implementation has not started. Preserve `baseline-kerr-v1` at `1bbcd14`. The immediate milestone is a sense of physical scale; probe dynamics, received signals, and horizon crossing follow separate acceptance gates. Technical explanation stays in this repository. Any in-scene instrumentation should be sparse, purposeful, and owner-directed.
+Status: the first probe/cabin and scale presentation is implemented on 8 September 2026, with static observer clocks; free fall, received signals, and the onboard infall camera remain planned. Preserve `baseline-kerr-v1` at `1bbcd14`. The immediate milestone is a sense of physical scale; probe dynamics, received signals, and horizon crossing follow separate acceptance gates. Technical explanation stays in this repository. Any in-scene instrumentation should be sparse, purposeful, and owner-directed.
 
 ## References and creative interpretation
 
@@ -62,7 +62,7 @@ An onboard view requires a moving observer tetrad and an orientation transported
 
 Compute constraint: a moving viewpoint invalidates the current screen-space transport cache every frame. A cheap CPU worldline does not make a moving Kerr image cheap. Start with a fixed exterior observation point and precomputed selected signal connections. For an onboard sequence, use lower resolution during motion and full refinement on pause; consider a bounded precomputed camera path after measuring costs. Neighboring transport maps cannot be blindly interpolated across capture boundaries/caustics. Full free-roaming motion is a later benchmark gate.
 
-Probe worldline -> moving tetrad -> backward light transport -> retarded source sampling -> HDR image. Observer worldline + probe emissions -> connecting null paths -> received telemetry. Keep presentation playback speed separate from all physical clocks. The existing sixfold disk-animation speed is illustrative and must be reconciled with physical units before a mission-time claim.
+Probe worldline -> moving tetrad -> backward light transport -> retarded source sampling -> HDR image. Observer worldline + probe emissions -> connecting null paths -> received telemetry. Keep presentation playback speed separate from all physical clocks. The mission view now cancels the legacy shader’s sixfold animation speed and converts physical seconds to gravitational time units. Retarded source sampling remains unimplemented.
 
 ## Later: the boundary of prediction
 

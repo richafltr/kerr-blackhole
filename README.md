@@ -2,7 +2,7 @@
 
 **Public simulation:** https://kerr-blackhole.vercel.app
 
-Make general-relativistic simulation accessible on ordinary consumer hardware, without server GPU costs. The first application is a full-screen black-hole renderer inspired by Interstellar. The interface contains only pause, camera controls, and reset. Explanatory material is intentionally absent.
+Make general-relativistic simulation accessible on ordinary consumer hardware, without server GPU costs. The first application is a full-screen black-hole renderer inspired by Interstellar. The interface opens inside a minimal probe observation cabin, with viewpoint controls and physical clock instruments. Explanatory essays remain in the repository.
 
 The committed [objective](docs/OBJECTIVE.md) separates achieved capabilities from targets. The [technical plan](docs/TECHNICAL_PLAN.md) specifies the Hamiltonian equations, kernel costs, precision, memory, divergence, validation, and performance gates.
 
@@ -27,7 +27,7 @@ npm run build:vercel
 
 A production rollback is a separate deployment action: deploy that checkout to the existing Vercel project if needed. The tag preserves source and the dependency lockfile, not a guarantee that hosting URLs or future build infrastructure remain unchanged.
 
-**Next scoped milestone:** [Establish scale, then launch a probe](docs/PROBE_EXPERIENCE_SCOPE.md). This is an architecture proposal; no probe, infall camera, or mission clocks are implemented in this checkpoint. The simulation interface stays visual-first.
+**Current extension:** a procedural probe/cabin, scale sequence, and stationary-observer clocks now build on this preserved checkpoint. The tag itself contains only the original renderer. [Scope and staged architecture](docs/PROBE_EXPERIENCE_SCOPE.md); [hackathon milestone and demo script](docs/HACKATHON_MILESTONE.md).
 
 ## Run
 
@@ -63,7 +63,7 @@ Sources: [WGSL specification](https://www.w3.org/TR/WGSL/), [WebGL2 specificatio
 
 Use `G = c = M = 1`, signature (−,+,+,+), and spin axis z. The null Hamiltonian is `H = ½ g^{μν} pμ pν = 0`; integrate `dx^i/dλ = ∂H/∂p_i` and `dp_i/dλ = −∂H/∂x^i`. Stationarity conserves `p_t`. The CPU reference differentiates the metric with forward-mode automatic differentiation; the GLSL kernel uses separately written analytic derivatives.
 
-The camera is static at Kerr radius 24–55 M and initializes rays with a metric-orthonormal tetrad. Spin is restricted to −0.9…0.9. An opaque equatorial disk extends from the spin-dependent ISCO to 22 M. Disk crossings receive two Newton refinements. Circular emitter velocities determine the covariant frequency ratio; a three-band blackbody approximation at shifted temperature supplies color and intensity. The prescribed temperature profile, procedural texture, sixfold accelerated orbital animation, bloom, and tone mapping are presentation approximations. Texture animation does not include travel-time delays. This is not a calibrated radiative-transfer or fluid simulation.
+The camera is static at Kerr radius 24–55 M and initializes rays with a metric-orthonormal tetrad. Spin is restricted to −0.9…0.9. An opaque equatorial disk extends from the spin-dependent ISCO to 22 M. Disk crossings receive two Newton refinements. Circular emitter velocities determine the covariant frequency ratio; a three-band blackbody approximation at shifted temperature supplies color and intensity. The prescribed temperature profile, procedural texture, prescribed orbital texture animation, bloom, and tone mapping are presentation approximations. The mission view now converts seconds using GM/c³ and cancels the legacy shader’s sixfold animation multiplier; motion is consequently slow at 100 million solar masses. Texture animation still does not include travel-time delays. This is not a calibrated radiative-transfer or fluid simulation.
 
 Each ray has at most 900 RK4 steps. Capture uses a cutoff 0.025 M outside the horizon; escape uses radius 100 M and its outgoing direction, neglecting the remaining weak deflection. Exhausted and invalid rays have separate diagnostic statuses, although both display dark. Near-critical photon-ring accuracy needs further refinement; no film-style ray bundles or pixel-footprint antialiasing are implemented.
 
@@ -78,7 +78,7 @@ Each ray has at most 900 RK4 steps. Capture uses a cutoff 0.025 M outside the ho
 
 ## Verification
 
-Run `npm test`, `npm run typecheck`, `npx oxlint app lib tests client vite.vercel.config.ts`, and `npm run build:vercel`. Eighteen CPU tests cover the reference equations, tetrad, ISCO, conservation, and convergence. Open `/?validate=1` to run actual GPU/reference comparisons and cache checks; it is a diagnostic page, absent from the normal interface.
+Run `npm test`, `npm run typecheck`, `npx oxlint app lib tests client vite.vercel.config.ts`, and `npm run build:vercel`. Twenty-two CPU tests cover the reference equations, tetrad, ISCO, conservation, convergence, physical units, static clocks, and probe angular size. Open `/?validate=1` to run actual GPU/reference comparisons and cache checks; it is a diagnostic page, absent from the normal interface.
 
 On the recorded browser run, all 140 sampled Kerr rays agreed in classification, with maximum disk-hit discrepancy `1.473e-5 M`. See [validation results and limitations](docs/VALIDATION.md), rather than interpreting these selected-ray checks as a global accuracy guarantee.
 

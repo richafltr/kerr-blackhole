@@ -108,3 +108,249 @@ button:focus-visible {
   background: #311c1c;
   color: #fff;
 }
+/* Instrument panels are functional UI; the cabin and probe are WebGL meshes. */
+.probe-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.mission-header {
+  position: absolute;
+  top: 28px;
+  left: 32px;
+  right: 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 12px monospace;
+  letter-spacing: 0.16em;
+  color: #bbc6cc;
+  pointer-events: none;
+}
+.mission-status {
+  color: #829991;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.mission-status i {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: #9ac2af;
+  margin-right: 9px;
+  border-radius: 50%;
+}
+.perspectives {
+  position: absolute;
+  top: 68px;
+  left: 32px;
+  display: flex;
+  gap: 2px;
+  background: #090d11c9;
+  border: 1px solid #64747a38;
+  padding: 4px;
+  border-radius: 5px;
+}
+.perspectives button {
+  width: auto;
+  height: 32px;
+  padding: 0 13px;
+  font-size: 13px;
+  border-radius: 3px;
+  color: #96a3ad;
+}
+.perspectives button[aria-pressed='true'] {
+  background: #a5b8c51d;
+  color: #edf3f6;
+}
+.instruments {
+  position: absolute;
+  bottom: 115px;
+  left: 9%;
+  right: 9%;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  pointer-events: none;
+}
+.instruments section {
+  background: linear-gradient(135deg, #0b141bed, #070c10f5);
+  border: 1px solid #556d7d4f;
+  border-top: 2px solid #778b965e;
+  padding: 16px 22px;
+  min-width: 190px;
+  box-shadow: 0 5px 14px #0009;
+  border-radius: 3px;
+}
+.instruments span,
+.instruments small {
+  display: block;
+  font: 11px monospace;
+  letter-spacing: 0.08em;
+  color: #a3b4bd;
+}
+.instruments strong {
+  display: block;
+  font: clamp(20px, 2.5vw, 32px) monospace;
+  font-weight: 400;
+  color: #c0d9d7;
+  margin: 10px 0;
+  text-shadow: 0 0 10px #93c7bd33;
+  font-variant-numeric: tabular-nums;
+}
+.instruments small {
+  font-size: 10px;
+  color: #81949d;
+  letter-spacing: 0.035em;
+}
+.mission-footer {
+  position: absolute;
+  bottom: 22px;
+  left: 32px;
+  right: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  pointer-events: none;
+}
+.mission-footer > span {
+  font: 10px monospace;
+  letter-spacing: 0.06em;
+  color: #89949c;
+  max-width: 34%;
+  line-height: 1.8;
+}
+.mission-footer b {
+  font-weight: 400;
+  padding: 0 7px;
+  color: #55636b;
+}
+.sequence-button {
+  pointer-events: auto;
+  width: auto;
+  height: 34px;
+  font: 12px monospace;
+  border: 1px solid #8b9eab40;
+  padding: 0 12px;
+  border-radius: 4px;
+  background: #0b111bc9;
+}
+.scale-caption {
+  position: absolute;
+  left: 7%;
+  bottom: 20%;
+  pointer-events: none;
+  animation: caption-in 1.5s ease both;
+}
+.scale-caption > span {
+  font: 12px monospace;
+  letter-spacing: 0.16em;
+  color: #9fb0b8;
+}
+.scale-caption strong {
+  display: block;
+  font-size: clamp(34px, 5vw, 68px);
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  color: #e5edef;
+  margin: 14px 0;
+}
+.scale-caption p {
+  font-size: 14px;
+  color: #a9b7bd;
+  margin: 8px 0;
+}
+.scale-caption small {
+  font: 12px monospace;
+  color: #a9b7bd;
+}
+.toolbar {
+  z-index: 5;
+  bottom: 22px;
+  opacity: 0.8;
+  border-radius: 5px;
+}
+.controls {
+  z-index: 6;
+  max-height: 65dvh;
+  overflow-y: auto;
+}
+.error {
+  z-index: 10;
+}
+@keyframes caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 800px) {
+  .mission-header {
+    left: 18px;
+    right: 18px;
+    top: 18px;
+  }
+  .mission-id {
+    font-size: 10px;
+  }
+  .mission-status {
+    font-size: 10px;
+  }
+  .perspectives {
+    left: 18px;
+    top: 49px;
+  }
+  .perspectives button {
+    padding: 0 10px;
+  }
+  .instruments {
+    left: 5%;
+    right: 5%;
+    bottom: 120px;
+    gap: 10px;
+  }
+  .instruments section {
+    min-width: 0;
+    padding: 12px;
+    flex: 1;
+  }
+  .instruments span {
+    font-size: 10px;
+  }
+  .instruments small {
+    font-size: 9px;
+  }
+  .instruments section:last-child {
+    display: none;
+  }
+  .mission-footer {
+    left: 18px;
+    right: 18px;
+    bottom: 76px;
+    align-items: end;
+  }
+  .mission-footer > span {
+    max-width: 52%;
+    font-size: 9px;
+  }
+  .sequence-button {
+    font-size: 10px;
+  }
+  .scale-caption {
+    left: 7%;
+    bottom: 28%;
+  }
+  .toolbar {
+    bottom: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scale-caption {
+    animation: none;
+  }
+}
