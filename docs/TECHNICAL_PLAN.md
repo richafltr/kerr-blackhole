@@ -1,5 +1,7 @@
 # Numerical and GPU implementation plan
 
+Status: the WebGL2 Kerr kernel, tetrad camera, frequency shift, progressive transport cache, and GPU/reference checks are implemented. See [current results](VALIDATION.md). The remaining gates below are future work unless explicitly recorded there.
+
 ## Equations before effects
 
 Use units G=c=M=1. For a stationary metric, use the null Hamiltonian

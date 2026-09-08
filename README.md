@@ -6,7 +6,9 @@ Make general-relativistic simulation accessible on ordinary consumer hardware, w
 
 The committed [objective](docs/OBJECTIVE.md) separates achieved capabilities from targets. The [technical plan](docs/TECHNICAL_PLAN.md) specifies the Hamiltonian equations, kernel costs, precision, memory, divergence, validation, and performance gates.
 
-**Current physics: Schwarzschild, not Kerr.** Each pixel traces a null geodesic through a nonrotating black-hole spacetime and samples a thin accretion disk or distant procedural star field. The dark shadow and disk lensing emerge from light propagation. Disk emission, texture, rotation animation, exposure, and vignette are illustrative presentation models. This is not an accretion-fluid simulation or a reproduction of the film's renderer.
+**Current physics: Kerr null geodesics on the GPU.** A local orthonormal camera launches past-directed rays through the exact stationary Kerr metric. The shader integrates Hamilton's equations in Cartesian ingoing Kerr–Schild coordinates, with analytic metric derivatives, RK4, and position-dependent step sizes. Spin, shadow, disk lensing, and emitter/observer frequency shifts come from this model. This is light propagation in a prescribed spacetime, not an evolving Einstein-equation or accretion-fluid simulation.
+
+The expensive light transport is cached. Camera or spin changes produce a coarse preview and then refine the image in tiles; disk animation and exposure reuse the completed paths. [Measured validation](docs/VALIDATION.md) compares actual GPU readback with the float64 reference.
 
 ## Run
 
@@ -20,7 +22,7 @@ npm run typecheck
 npm run build:vercel
 ```
 
-Open the local URL printed by the server. WebGL2 and hardware acceleration are required. The Vercel target is a static Vite/React build with no server-side runtime or secrets. `vercel.json` configures the build and output; `npx vercel --prod` deploys after Vercel login. The original Sites scripts (`dev`, `build`, `start`) remain available separately.
+Open the local URL printed by the server. WebGL2, floating-point render targets, and hardware acceleration are required. The Vercel target is a static Vite/React build with no server-side runtime or secrets. `vercel.json` configures the build and output; `npx vercel --prod` deploys after Vercel login. The original Sites scripts (`dev`, `build`, `start`) remain available separately.
 
 ## Stack and why
 
@@ -40,56 +42,37 @@ Sources: [WGSL specification](https://www.w3.org/TR/WGSL/), [WebGL2 specificatio
 
 ## Implemented image formation
 
-Use `G = c = M = 1`. Spherical symmetry confines each Schwarzschild ray to a plane. In that plane, with `u = 1/r` and `q = du/dφ`, the null orbit equation is:
+Use `G = c = M = 1`, signature (−,+,+,+), and spin axis z. The null Hamiltonian is `H = ½ g^{μν} pμ pν = 0`; integrate `dx^i/dλ = ∂H/∂p_i` and `dp_i/dλ = −∂H/∂x^i`. Stationarity conserves `p_t`. The CPU reference differentiates the metric with forward-mode automatic differentiation; the GLSL kernel uses separately written analytic derivatives.
 
-```text
-du/dφ = q
-dq/dφ = −u + 3u²
-q² + u² − 2u³ = 1/b²
-```
+The camera is static at Kerr radius 24–55 M and initializes rays with a metric-orthonormal tetrad. Spin is restricted to −0.9…0.9. An opaque equatorial disk extends from the spin-dependent ISCO to 22 M. Disk crossings receive two Newton refinements. Circular emitter velocities determine the covariant frequency ratio; a three-band blackbody approximation at shifted temperature supplies color and intensity. The prescribed temperature profile, procedural texture, sixfold accelerated orbital animation, bloom, and tone mapping are presentation approximations. Texture animation does not include travel-time delays. This is not a calibrated radiative-transfer or fluid simulation.
 
-A static camera at radius R initializes the impact parameter from its local viewing angle α:
+Each ray has at most 900 RK4 steps. Capture uses a cutoff 0.025 M outside the horizon; escape uses radius 100 M and its outgoing direction, neglecting the remaining weak deflection. Exhausted and invalid rays have separate diagnostic statuses, although both display dark. Near-critical photon-ring accuracy needs further refinement; no film-style ray bundles or pixel-footprint antialiasing are implemented.
 
-```text
-b = R sin(α) / sqrt(1 − 2/R)
-```
+## Compute budget
 
-The shader integrates with RK4 at angular step `0.012`, up to 650 steps. It checks disk-plane crossings, capture at `r = 2 M`, and escape at `u = 0`. Escape direction is interpolated across the last angular step. Disk crossings use linear interpolation between adjacent positions. A first hit in the disk annulus `6 ≤ r/M ≤ 22` terminates the ray as an opaque surface.
+- WebGL2 plus `EXT_color_buffer_float` is required. Unsupported hardware shows an error.
+- Transport uses RGBA32F; emission uses RGBA16F. No synchronous readback occurs in the normal render loop.
+- Internal longest edge is capped at 1280 pixels, multiplied by quality (default 0.8).
+- A coarse preview is followed by roughly 8,192-pixel refinement tiles. Refinement adds spatial resolution, not additional samples per pixel.
+- Camera, spin, viewport, or resolution changes invalidate transport. Exposure and disk animation do not. This cache is valid because the metric and opaque disk geometry are stationary.
+- Diagnostic GPU timing uses asynchronous disjoint timer queries when available. Current measurements are a short development-device check, not a sustained FPS guarantee or a cross-device benchmark.
 
-The disk's inner edge is at the Schwarzschild ISCO. Warm emission and differential angular animation are procedural. Gravitational/Doppler frequency shifts, fluid dynamics, optical depth, returning radiation, finite light-travel time in the evolving texture, and film-style ray bundles are not implemented. The camera is kept outside the disk at radii 24–55 M.
+## Verification
 
-Near-critical rays that exhaust the step budget render dark; they are not proven captured. This can bias the narrow photon-ring region. Single-precision GPU integration, fixed steps, and single-sample pixel rendering also limit fidelity. CPU reference results do not establish equivalent GPU error; direct GPU readback validation remains to be added.
+Run `npm test`, `npm run typecheck`, `npx oxlint app lib tests client vite.vercel.config.ts`, and `npm run build:vercel`. Eighteen CPU tests cover the reference equations, tetrad, ISCO, conservation, and convergence. Open `/?validate=1` to run actual GPU/reference comparisons and cache checks; it is a diagnostic page, absent from the normal interface.
 
-Internal resolution is capped to a 1,100-pixel longest edge, multiplied by the resolution control (default 0.7). This is an explicit quality/performance tradeoff. No FPS or speedup claim has been measured for this renderer.
-
-## Kerr reference milestone
-
-`lib/kerr.ts` implements a float64 Hamiltonian null-geodesic solver in Cartesian ingoing Kerr–Schild coordinates (signature −,+,+,+, spin axis z). Forward-mode automatic differentiation computes the spatial derivatives of the metric field without finite-difference gradients in the integrator. `p_t` is conserved by the stationary system; the solver integrates position and spatial covariant momentum using RK4.
-
-Tests cover the analytic a=0 inverse metric, derivatives checked by independent central differences, null initialization, null and axial-angular-momentum conservation, radial capture, spin-reflection symmetry, and fourth-order step refinement. For the documented a=0.7 escaping test ray, maximum normalized Hamiltonian residual is about `2.77e-11` and relative axial-angular-momentum drift `4.45e-12`. These apply to that float64 test trajectory, not the GPU image or all Kerr conditions.
-
-This solver is a validation foundation, not yet a GPU kernel. Its coordinate-momentum initializer is not a camera tetrad. A physically calibrated Kerr camera, emitter model, GPU implementation, and GPU/reference comparisons remain required before advertising Kerr imagery. No black-hole interior or evolving Einstein-equation solve is implemented.
-
-## Checks
-
-`tests/light.test.ts` checks capture/escape on either side of analytic `bcrit = 3√3 M`, the photon sphere fixed orbit at `r = 3 M`, the null-orbit invariant, and step refinement for an escaping ray.
-
-Float64 reference at impact parameter `b = 6 M`: maximum relative invariant drift about `7.61e-11` at step 0.012. Escaping direction agrees within `1e-5` radians when the step is halved. These are CPU reference checks, not GPU error bounds.
-
-The previous timelike-orbit reference and its four tests remain in `lib/physics.ts` and `tests/physics.test.ts`; they are not displayed in the interface. Fourteen physics tests, TypeScript, authored-code lint, and the static production build pass. Automated browser interaction/visual QA and a GPU timing benchmark have not been performed.
+On the recorded browser run, all 140 sampled Kerr rays agreed in classification, with maximum disk-hit discrepancy `1.473e-5 M`. See [validation results and limitations](docs/VALIDATION.md), rather than interpreting these selected-ray checks as a global accuracy guarantee.
 
 The generated scaffold has pre-existing lint issues in unused UI components/hooks and 11 npm audit advisories (8 high), not remediated in this prototype.
 
 ## Next fidelity gates
 
-1. Compare GPU ray results against the float64 reference, including near-critical rays and disk intersections.
-2. Improve intersection localization, antialiasing, and ray-budget convergence; profile the actual M4/browser.
-3. Add bloom as a clearly separated display pass if desired, and refine disk emission.
-4. Implement Kerr geodesics and consistent camera frames, then validate spin-zero agreement before exposing spin.
+1. Dense near-critical ray tests, Carter-constant monitoring, and budget/escape-radius convergence.
+2. Pixel-footprint filtering or ray bundles to resolve narrow images without shimmer.
+3. Retarded disk animation and a more complete emission/transfer model.
+4. Sustained profiling and quality adaptation across integrated GPUs and mobile devices. Consider WebGPU only when measured scheduling gains justify a second backend.
 
-A full Kerr renderer requires a different geodesic solver: the planar Schwarzschild reduction cannot model frame dragging. Do not fake spin by rotating disk textures.
-
-[James et al., Interstellar's DNGR paper](https://arxiv.org/abs/1502.03808) provides the film reference. [David Tong's GR notes](https://www.damtp.cam.ac.uk/user/tong/gr/grhtml/S1.html) give Schwarzschild geodesic background.
+[James et al., Interstellar's DNGR paper](https://arxiv.org/abs/1502.03808) is the scientific film reference, not source code incorporated into this repository. Film-quality beam tracing is a later milestone.
 
 ## Submission
 

@@ -5,8 +5,11 @@ import '../app/globals.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing application root');
-createRoot(root).render(
-  <React.StrictMode>
-    <Page />
-  </React.StrictMode>,
-);
+if (new URLSearchParams(location.search).has('validate')) {
+  void import('./validation').then(({ runValidation }) => runValidation(root));
+} else
+  createRoot(root).render(
+    <React.StrictMode>
+      <Page />
+    </React.StrictMode>,
+  );

@@ -1,78 +1,34 @@
+import { makeCamera, isco } from './camera.ts';
+import type { KerrState } from './kerr.ts';
+import { fullscreenVertex, transportFragment } from './kerr-glsl.ts';
+import { shadeFragment, displayFragment } from './shading-glsl.ts';
+import { program, texture, target, removeTarget, type Target } from './gpu.ts';
 export type View = {
   inclination: number;
   roll: number;
   exposure: number;
   distance: number;
   quality: number;
+  spin: number;
 };
 export const defaultView: View = {
   inclination: 77,
-  roll: -12,
-  exposure: 1.2,
+  roll: -8,
+  exposure: 1.35,
   distance: 30,
-  quality: 0.7,
+  quality: 0.8,
+  spin: 0.6,
 };
-const vertex = `#version 300 es
-void main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}`;
-const fragment = `#version 300 es
-precision highp float;
-out vec4 fragColor;
-uniform vec2 resolution;
-uniform float time, inclination, roll, exposure, cameraRadius;
-#define PI 3.141592653589793
-float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1)),f.x),f.y);}
-vec3 disk(vec3 hit){
- float r=length(hit),a=atan(hit.z,hit.x),flow=a-time*.8/pow(r,1.5);
- float radial=noise(vec2(r*5.,flow*4.));
- float fine=noise(vec2(r*24.,flow*11.));
- float threads=.5+.5*sin(r*29.+3.*sin(flow*9.)+noise(vec2(r*3.,flow*5.))*5.);
- float bands=.40+.60*noise(vec2(r*11.,0.));
- float texture=(.30+radial*.8+fine*.35+threads*.20)*bands;
- float inner=smoothstep(6.,6.5,r),outer=1.-smoothstep(17.,22.,r);
- float heat=pow(6./r,2.2)*inner*outer;
- vec3 tint=mix(vec3(1.,.24,.045),vec3(1.,.83,.60),pow(clamp(heat,0.,1.),.45));
- return tint*heat*texture*12.;
-}
-vec3 sky(vec3 d){
- vec2 uv=vec2(atan(d.z,d.x)/(2.*PI)+.5,asin(clamp(d.y,-1.,1.))/PI+.5);
- vec2 grid=uv*vec2(1800.,900.);vec2 cell=floor(grid),f=fract(grid);
- float h=hash(cell);float star=pow(max(0.,1.-length(f-vec2(hash(cell+7.),hash(cell+13.)))*2.8),8.)*step(.997,h);
- return vec3(.0006,.0008,.0012)+vec3(.8,.86,1.)*star*.9;
-}
-vec2 deriv(vec2 s){return vec2(s.y,-s.x+3.*s.x*s.x);}
-vec2 rk4(vec2 s,float h){vec2 a=deriv(s),b=deriv(s+a*h*.5),c=deriv(s+b*h*.5),d=deriv(s+c*h);return s+h*(a+2.*b+2.*c+d)/6.;}
-void main(){
- vec2 uv=(gl_FragCoord.xy-.5*resolution)/resolution.y*2.;
- float cr=cos(roll),sr=sin(roll);uv=mat2(cr,-sr,sr,cr)*uv;
- vec3 radial=vec3(0.,cos(inclination),sin(inclination));
- vec3 right=vec3(1.,0.,0.),up=normalize(cross(radial,right));
- vec3 ray=normalize(-radial+.38*(uv.x*right+uv.y*up));
- float tangential=length(cross(ray,radial));
- float b=cameraRadius*tangential/sqrt(1.-2./cameraRadius);
- vec3 color=vec3(0.);bool resolved=false;
- if(b>.00001){
- vec3 tangent=normalize(ray-radial*dot(ray,radial));
- float u=1./cameraRadius;vec2 s=vec2(u,sqrt(max(0.,1./(b*b)-u*u+2.*u*u*u)));
- vec3 previous=radial*cameraRadius;float phi=0.;
- for(int i=0;i<650;i++){
-  float h=.012;vec2 next=rk4(s,h);phi+=h;
-  if(next.x<=0.){float endpoint=phi-h+h*s.x/(s.x-next.x);color=sky(radial*cos(endpoint)+tangent*sin(endpoint));resolved=true;break;}
-  vec3 pos=(radial*cos(phi)+tangent*sin(phi))/next.x;
-  if(previous.y*pos.y<0.){
-   float t=previous.y/(previous.y-pos.y);vec3 hit=mix(previous,pos,t);float r=length(hit);
-   if(r>=6.&&r<=22.){color=disk(hit);resolved=true;break;}
-  }
-  if(next.x>=.5){resolved=true;break;}
-  previous=pos;s=next;
- }
- }
- // Unresolved near-critical rays are dark at this bounded integration budget.
- vec3 mapped=vec3(1.)-exp(-color*exposure);
- mapped=pow(mapped,vec3(1./2.2));
- float vignette=1.-.13*min(1.,dot(uv,uv)*.3);
- fragColor=vec4(mapped*vignette,1.);
-}`;
+export type RenderStats = {
+  transportPasses: number;
+  cachedFrames: number;
+  progress: number;
+  gpuTransportMs: number[];
+  gpuShadeMs: number[];
+  width: number;
+  height: number;
+  floatBufferBytes: number;
+};
 export function createRenderer(canvas: HTMLCanvasElement) {
   const context = canvas.getContext('webgl2', {
     antialias: false,
@@ -83,60 +39,263 @@ export function createRenderer(canvas: HTMLCanvasElement) {
       'WebGL2 is unavailable. Enable GPU acceleration or use another browser.',
     );
   const gl: WebGL2RenderingContext = context;
-  const compile = (type: number, source: string) => {
-    const s = gl.createShader(type)!;
-    gl.shaderSource(s, source);
-    gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-      const message = gl.getShaderInfoLog(s);
-      gl.deleteShader(s);
-      throw new Error(message || 'Shader compilation failed');
-    }
-    return s;
+  if (!gl.getExtension('EXT_color_buffer_float'))
+    throw new Error(
+      'This GPU does not expose floating-point render targets required by the Kerr renderer.',
+    );
+  const transport = program(gl, fullscreenVertex, transportFragment),
+    shade = program(gl, fullscreenVertex, shadeFragment),
+    display = program(gl, fullscreenVertex, displayFragment);
+  const locate = (p: WebGLProgram, names: string[]) =>
+    Object.fromEntries(names.map((n) => [n, gl.getUniformLocation(p, n)]));
+  const tu = locate(transport, [
+    'resolution',
+    'roll',
+    'cameraPosition',
+    'observer',
+    'forwardBasis',
+    'rightBasis',
+    'upBasis',
+    'spin',
+    'innerRadius',
+    'stepScale',
+    'diagnostics',
+    'includeDisk',
+    'initialX',
+    'initialP',
+  ]);
+  const su = locate(shade, [
+    'resolution',
+    'spin',
+    'innerRadius',
+    'time',
+    'transportMap',
+    'previewMap',
+  ]);
+  const du = locate(display, ['resolution', 'exposure', 'emission']);
+  const timer = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+  const pending: { query: WebGLQuery; kind: 'transport' | 'shade' }[] = [];
+  const stats: RenderStats = {
+    transportPasses: 0,
+    cachedFrames: 0,
+    progress: 0,
+    gpuTransportMs: [],
+    gpuShadeMs: [],
+    width: 0,
+    height: 0,
+    floatBufferBytes: 0,
   };
-  const vs = compile(gl.VERTEX_SHADER, vertex),
-    fs = compile(gl.FRAGMENT_SHADER, fragment),
-    program = gl.createProgram()!;
-  gl.attachShader(program, vs);
-  gl.attachShader(program, fs);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS))
-    throw new Error(gl.getProgramInfoLog(program) || 'Shader link failed');
-  gl.useProgram(program);
-  const uniforms = Object.fromEntries(
-    [
-      'resolution',
-      'time',
-      'inclination',
-      'roll',
-      'exposure',
-      'cameraRadius',
-    ].map((n) => [n, gl.getUniformLocation(program, n)]),
-  );
-  return {
-    render(time: number, view: View) {
-      const rect = canvas.getBoundingClientRect();
-      const scale =
-        Math.min(1, 1100 / Math.max(rect.width, rect.height)) * view.quality;
-      const width = Math.max(1, Math.round(rect.width * scale)),
-        height = Math.max(1, Math.round(rect.height * scale));
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
+  let low: Target | null = null,
+    high: Target | null = null,
+    hdr: Target | null = null,
+    lastKey = '',
+    row = 0;
+  function bindTexture(unit: number, t: WebGLTexture) {
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+  }
+  function timed(kind: 'transport' | 'shade', draw: () => void) {
+    if (!timer || pending.length > 12) {
+      draw();
+      return;
+    }
+    const q = gl.createQuery()!;
+    gl.beginQuery(timer.TIME_ELAPSED_EXT, q);
+    draw();
+    gl.endQuery(timer.TIME_ELAPSED_EXT);
+    pending.push({ query: q, kind });
+  }
+  function poll() {
+    if (!timer) return;
+    const disjoint = gl.getParameter(timer.GPU_DISJOINT_EXT);
+    for (let i = pending.length - 1; i >= 0; i--) {
+      const p = pending[i];
+      if (gl.getQueryParameter(p.query, gl.QUERY_RESULT_AVAILABLE)) {
+        if (!disjoint) {
+          const list =
+            p.kind === 'transport' ? stats.gpuTransportMs : stats.gpuShadeMs;
+          list.push(
+            Number(gl.getQueryParameter(p.query, gl.QUERY_RESULT)) / 1e6,
+          );
+          if (list.length > 600) list.shift();
+        }
+        gl.deleteQuery(p.query);
+        pending.splice(i, 1);
+      } else if (disjoint) {
+        gl.deleteQuery(p.query);
+        pending.splice(i, 1);
       }
-      gl.viewport(0, 0, width, height);
-      gl.uniform2f(uniforms.resolution, width, height);
-      gl.uniform1f(uniforms.time, time);
-      gl.uniform1f(uniforms.inclination, (view.inclination * Math.PI) / 180);
-      gl.uniform1f(uniforms.roll, (view.roll * Math.PI) / 180);
-      gl.uniform1f(uniforms.exposure, view.exposure);
-      gl.uniform1f(uniforms.cameraRadius, view.distance);
+    }
+  }
+  function setTransport(view: View) {
+    const camera = makeCamera(view.distance, view.inclination, view.spin);
+    gl.useProgram(transport);
+    gl.uniform1f(tu.spin, view.spin);
+    gl.uniform1f(tu.innerRadius, isco(view.spin));
+    gl.uniform1f(tu.stepScale, 1);
+    gl.uniform1i(tu.diagnostics, 0);
+    gl.uniform1i(tu.includeDisk, 1);
+    gl.uniform1i(tu.initialX, 3);
+    gl.uniform1i(tu.initialP, 4);
+    gl.uniform1f(tu.roll, (view.roll * Math.PI) / 180);
+    gl.uniform3fv(tu.cameraPosition, camera.position);
+    gl.uniform4fv(tu.observer, camera.observer);
+    gl.uniform4fv(tu.forwardBasis, camera.forward);
+    gl.uniform4fv(tu.rightBasis, camera.right);
+    gl.uniform4fv(tu.upBasis, camera.up);
+  }
+  function render(time: number, view: View): RenderStats {
+    if (gl.isContextLost())
+      throw new Error(
+        'GPU context was lost. Reload to restore the simulation.',
+      );
+    poll();
+    const rect = canvas.getBoundingClientRect(),
+      ratio = rect.width / Math.max(1, rect.height),
+      longest = Math.max(rect.width, rect.height),
+      scale = Math.min(1, 1280 / Math.max(1, longest)) * view.quality;
+    const w = Math.max(1, Math.round(rect.width * scale)),
+      h = Math.max(1, Math.round(rect.height * scale));
+    const key = [
+      w,
+      h,
+      view.distance,
+      view.inclination,
+      view.roll,
+      view.spin,
+    ].join('/');
+    if (key !== lastKey) {
+      const lw = Math.max(1, Math.round(Math.min(w, 280))),
+        lh = Math.max(1, Math.round(lw / ratio));
+      removeTarget(gl, low);
+      removeTarget(gl, high);
+      removeTarget(gl, hdr);
+      low = target(gl, lw, lh);
+      high = target(gl, w, h);
+      hdr = target(gl, w, h, true);
+      gl.clearColor(0, 0, 0, -1);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, high.fbo);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      setTransport(view);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, low.fbo);
+      gl.viewport(0, 0, lw, lh);
+      gl.uniform2f(tu.resolution, lw, lh);
+      timed('transport', () => gl.drawArrays(gl.TRIANGLES, 0, 3));
+      stats.transportPasses++;
+      row = 0;
+      lastKey = key;
+      canvas.width = w;
+      canvas.height = h;
+      stats.width = w;
+      stats.height = h;
+      stats.floatBufferBytes = lw * lh * 16 + w * h * 24;
+    } else if (high && row < high.h) {
+      setTransport(view);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, high.fbo);
+      gl.viewport(0, 0, high.w, high.h);
+      gl.uniform2f(tu.resolution, high.w, high.h);
+      const rows = Math.min(
+        Math.max(1, Math.floor(8192 / high.w)),
+        high.h - row,
+      );
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(0, row, high.w, rows);
+      timed('transport', () => gl.drawArrays(gl.TRIANGLES, 0, 3));
+      gl.disable(gl.SCISSOR_TEST);
+      row += rows;
+      stats.transportPasses++;
+    } else stats.cachedFrames++;
+    if (!low || !high || !hdr) return stats;
+    stats.progress = row / high.h;
+    timed('shade', () => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, hdr!.fbo);
+      gl.viewport(0, 0, w, h);
+      gl.useProgram(shade);
+      bindTexture(0, high!.tex);
+      bindTexture(1, low!.tex);
+      gl.uniform1i(su.transportMap, 0);
+      gl.uniform1i(su.previewMap, 1);
+      gl.uniform2f(su.resolution, w, h);
+      gl.uniform1f(su.spin, view.spin);
+      gl.uniform1f(su.innerRadius, isco(view.spin));
+      gl.uniform1f(su.time, time);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
-    },
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.useProgram(display);
+      bindTexture(0, hdr!.tex);
+      gl.uniform1i(du.emission, 0);
+      gl.uniform2f(du.resolution, w, h);
+      gl.uniform1f(du.exposure, view.exposure);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    });
+    return stats;
+  }
+  function diagnose(
+    rays: { state: KerrState; pt: number }[],
+    a: number,
+    stepScale = 1,
+    includeDisk = true,
+  ) {
+    const n = rays.length,
+      out = target(gl, n, 1),
+      checks = texture(gl, n, 1),
+      xs = new Float32Array(n * 4),
+      ps = new Float32Array(n * 4);
+    rays.forEach((r, i) => {
+      xs.set([...r.state.slice(0, 3), r.pt], i * 4);
+      ps.set([...r.state.slice(3), 0], i * 4);
+    });
+    const tx = texture(gl, n, 1, xs),
+      tp = texture(gl, n, 1, ps);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo);
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT1,
+      gl.TEXTURE_2D,
+      checks,
+      0,
+    );
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+    gl.viewport(0, 0, n, 1);
+    gl.disable(gl.SCISSOR_TEST);
+    gl.useProgram(transport);
+    gl.uniform1i(tu.diagnostics, 1);
+    gl.uniform1i(tu.includeDisk, includeDisk ? 1 : 0);
+    gl.uniform1f(tu.spin, a);
+    gl.uniform1f(tu.innerRadius, isco(a));
+    gl.uniform1f(tu.stepScale, stepScale);
+    bindTexture(3, tx);
+    bindTexture(4, tp);
+    gl.uniform1i(tu.initialX, 3);
+    gl.uniform1i(tu.initialP, 4);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    const data = new Float32Array(n * 4),
+      errors = new Float32Array(n * 4);
+    gl.readBuffer(gl.COLOR_ATTACHMENT0);
+    gl.readPixels(0, 0, n, 1, gl.RGBA, gl.FLOAT, data);
+    gl.readBuffer(gl.COLOR_ATTACHMENT1);
+    gl.readPixels(0, 0, n, 1, gl.RGBA, gl.FLOAT, errors);
+    const error = gl.getError();
+    removeTarget(gl, out);
+    gl.deleteTexture(checks);
+    gl.deleteTexture(tx);
+    gl.deleteTexture(tp);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (error !== gl.NO_ERROR) throw new Error(`GPU readback error ${error}`);
+    return { data, errors };
+  }
+  return {
+    render,
+    diagnose,
+    stats,
     dispose() {
-      gl.deleteProgram(program);
-      gl.deleteShader(vs);
-      gl.deleteShader(fs);
+      removeTarget(gl, low);
+      removeTarget(gl, high);
+      removeTarget(gl, hdr);
+      gl.deleteProgram(transport);
+      gl.deleteProgram(shade);
+      gl.deleteProgram(display);
+      pending.forEach((p) => gl.deleteQuery(p.query));
     },
   };
 }

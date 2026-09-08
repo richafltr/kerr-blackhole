@@ -10,28 +10,16 @@ Solve null geodesics in a prescribed spacetime. Schwarzschild and Kerr are exact
 
 The desired technical achievement is an accessible renderer whose numerical output can be checked against a double-precision reference, whose optimizations preserve a declared error tolerance, and whose performance is measured on affordable hardware. Do not claim a first-ever simulator, film-level fidelity, universal device support, or unmeasured speedups.
 
-## Current versus target
+## Achieved milestone
 
-| Area | Current shipped image | Next acceptance gate |
-| --- | --- | --- |
-| Metric | Exact Schwarzschild null-orbit ODE | Kerr metric with consistent camera initialization and spin-zero agreement |
-| GPU method | Fragment shader, per-pixel RK4, fixed angular step | Compare kernel outputs against float64 reference before optimization |
-| Disk | Thin opaque annulus; procedural illustrative emission | Covariant frequency shift and documented emitter velocity model |
-| Accuracy | Selected float64 analytic-limit and convergence tests | GPU capture/escape, disk-hit, null-constraint and convergence measurements |
-| Performance | Capped internal resolution; no validated timing claim | Median/p95 GPU time, step distributions, unresolved fraction, memory footprint |
-| Distribution | Public Vercel static build | Validate on additional lower-resource devices; no server-side GPU rendering |
+The browser now integrates Kerr null geodesics with a metric-orthonormal camera, analytic GPU derivatives, circular disk emitters, and covariant frequency shifts. A fixed-grid GPU readback test agrees with the float64 reference for 140 sampled rays. Stationary light transport is cached and refined progressively, so disk animation and exposure changes avoid repeating the geodesic integration. See [measured validation and limits](VALIDATION.md).
 
-## What would qualify as a technical feat
+## Remaining technical gates
 
-1. Integrate Kerr null geodesics on a consumer GPU, with visible spin-dependent frame dragging arising from the equations.
-2. Demonstrate agreement with an independent float64 path and analytic Schwarzschild limits.
-3. Show an optimization at the same scene, resolution, ray budget and error tolerance; report the measured before/after GPU time.
-4. Make a public browser build work without account sign-in or server compute, while reporting unsupported-device and lost-context conditions honestly.
+Resolve narrow higher-order images with controlled sampling, validate near-critical rays and further invariants, and measure sustained performance on lower-resource hardware. Full fluid dynamics, evolving spacetime, and film-level ray-bundle fidelity are outside this milestone. No universal speedup or device-support claim is made.
 
-These are targets until measured and documented. The first milestone is a validated numerical foundation, not a claim that the final kernel already exists.
+## Submission description
 
-## Submission description, bounded to actual progress
+This project makes general-relativistic black-hole rendering available through a public browser link. It integrates light paths in the Kerr metric on the visitor's GPU, checks selected trajectories against a double-precision reference, and caches stationary light transport so animation can run without repeating the expensive integration. The disk is a prescribed thin emission model, not an evolved accretion flow. Vercel serves static assets; no server GPU or account is required.
 
-This project works toward making general-relativistic black-hole simulations accessible on consumer hardware. Its browser renderer integrates Schwarzschild light paths on the GPU, with a separate float64 validation path. The next milestone is a checked Kerr kernel and physically specified emission, with explicit accuracy and performance budgets. Rendering runs on the viewer's device rather than a paid server GPU.
-
-Revise the description to reflect actual achieved Kerr validation, benchmarks, and deployment at submission time. Record actual Astra use and observed feedback separately.
+Record actual Astra use and observed feedback separately. The technical achievement is validated numerical transport and reuse under limited compute, with remaining accuracy and hardware limits documented openly.

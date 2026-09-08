@@ -31,7 +31,12 @@ export default function Page() {
     const tick = (now: number) => {
       if (last && !paused.current) time += Math.min(0.1, (now - last) / 1000);
       last = now;
-      renderer.render(time, settings.current);
+      try {
+        renderer.render(time, settings.current);
+      } catch (e) {
+        setError(String(e));
+        return;
+      }
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
@@ -84,6 +89,7 @@ export default function Page() {
         <section className="controls" aria-label="Camera controls">
           {(
             [
+              { key: 'spin', label: 'Spin', min: -0.9, max: 0.9, step: 0.05 },
               {
                 key: 'inclination',
                 label: 'Inclination',
