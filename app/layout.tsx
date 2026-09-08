@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Kerr Lab — Schwarzschild Orbit Experiment', description: 'Explore precession, stable orbits, and capture with an interactive Schwarzschild geodesic experiment.',
+  title: 'Black Hole', description: 'A GPU-rendered black hole with a gravitationally lensed accretion disk.',
 };
 
 export default function RootLayout({
