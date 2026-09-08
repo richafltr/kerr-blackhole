@@ -354,3 +354,258 @@ button:focus-visible {
     animation: none;
   }
 }
+/* Vesper: the art is a foreground asset; the window remains the live renderer. */
+main {
+  position: relative;
+  background: #030405;
+}
+.universe {
+  position: absolute;
+  inset: 0;
+}
+.perspective-onboard .universe {
+  top: 0;
+  height: 76%;
+  bottom: auto;
+}
+.probe-layer {
+  position: absolute;
+  inset: 0;
+}
+.cabin-art {
+  position: absolute;
+  inset: 0;
+  background: url('/assets/cabin-v2.png') center / 100% 100% no-repeat;
+  mask: url('/assets/cabin-mask.svg') center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+.flight-heading {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 5%;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  font: 12px monospace;
+  letter-spacing: 0.25em;
+  color: #b6a789;
+  text-shadow: 0 2px 5px #000;
+}
+.flight-heading b {
+  font-weight: 400;
+  opacity: 0.4;
+  margin: 0 12px;
+}
+.flight-readout {
+  position: absolute;
+  left: 4%;
+  top: 12%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font: 12px monospace;
+  color: #c5b491;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  text-shadow: 0 2px 5px #000;
+}
+.flight-readout b {
+  font-weight: 400;
+  margin-left: 8px;
+  color: #dfd2b6;
+}
+.perspective-onboard .flight-readout {
+  left: 28%;
+  top: 76%;
+  font-size: 12px;
+  gap: 6px;
+}
+.console-choice {
+  position: absolute;
+  left: 50%;
+  top: 76%;
+  transform: translate(-50%, -12%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  text-align: center;
+}
+.choice-eyebrow {
+  font: 10px monospace;
+  letter-spacing: 0.16em;
+  color: #b4986c;
+  white-space: nowrap;
+}
+button.release {
+  width: auto;
+  height: auto;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 0;
+  border: 1px solid #a78a4e66;
+  color: #e3c38b;
+  background: #100e0ad9;
+  font: clamp(12px, 1.25vw, 18px) monospace;
+  letter-spacing: 0.2em;
+}
+button.release:hover {
+  background: #b0853933;
+  box-shadow: 0 0 24px #ce9c3e22;
+}
+button.remain {
+  width: auto;
+  height: auto;
+  font: 10px monospace;
+  letter-spacing: 0.09em;
+  color: #a3967c;
+  border-radius: 0;
+}
+.flight-clock {
+  font: clamp(13px, 1.5vw, 23px) monospace;
+  font-weight: 400;
+  color: #dfc9a0;
+}
+.view-dock {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  background: #050709d9;
+  border: 1px solid #8c785341;
+}
+.view-dock button {
+  width: 82px;
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  color: #968f80;
+}
+.view-dock button span {
+  font: 9px monospace;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.view-dock button[aria-pressed='true'] {
+  color: #e1c492;
+  border-color: #c19b544f;
+  background: #9c7b2720;
+}
+.flight-tools {
+  position: absolute;
+  left: 22px;
+  bottom: 22px;
+  display: flex;
+  background: #06090acc;
+  border: 1px solid #8c78532b;
+}
+.flight-tools button {
+  height: 34px;
+  width: 34px;
+  display: grid;
+  place-items: center;
+  color: #aaa08b;
+  border-radius: 0;
+}
+.controls {
+  left: 22px;
+  bottom: 70px;
+  transform: none;
+  border-radius: 2px;
+  background: #07090bef;
+}
+.reference-note {
+  font: 12px monospace;
+  color: #b7a88c;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #80745c44;
+}
+.timewarp {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #b29055;
+}
+.exterior-restart {
+  position: absolute;
+  bottom: 40%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  font: 13px monospace;
+  letter-spacing: 0.15em;
+  color: #d4bc93;
+  background: #080a0dcc;
+  padding: 10px 20px;
+}
+@media (max-width: 800px) {
+  .view-dock {
+    right: 12px;
+    bottom: 12px;
+    gap: 1px;
+    padding: 3px;
+  }
+  .view-dock button {
+    width: 61px;
+    height: 53px;
+    gap: 6px;
+  }
+  .view-dock button span {
+    font-size: 8px;
+  }
+  .flight-tools {
+    left: 12px;
+    bottom: 12px;
+  }
+  .flight-tools button {
+    width: 28px;
+    height: 30px;
+  }
+  .flight-heading {
+    font-size: 10px;
+    top: 3%;
+  }
+  .flight-readout {
+    font-size: 10px;
+  }
+  .perspective-onboard .flight-readout {
+    left: 22%;
+    top: 76%;
+    font-size: 10px;
+  }
+  .console-choice {
+    top: 76%;
+    left: 50%;
+  }
+  .choice-eyebrow {
+    font-size: 8px;
+  }
+  .cabin-art {
+    background-size: 145% 100%;
+    mask-size: 145% 100%;
+  }
+  .perspective-onboard .flight-heading {
+    left: 8%;
+    right: 8%;
+  }
+  button.release {
+    min-height: 34px;
+    font-size: 11px;
+  }
+  button.remain {
+    font-size: 9px;
+  }
+  .flight-clock {
+    font-size: 14px;
+  }
+}
+
+.cabin-art {width:100%;height:100%;object-fit:fill;background:none;mask-size:100% 100%;}
+@media(max-width:800px){.cabin-art{width:145%;left:-22.5%;mask-size:100% 100%;}.console-choice{left:50%;}}

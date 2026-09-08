@@ -28,6 +28,15 @@ export function makeCamera(
   const g = covariantMetric(position, a);
   if (g[0][0] >= 0)
     throw new Error('Static observer must be outside the ergosphere');
+  return observerCamera(position, [1 / Math.sqrt(-g[0][0]), 0, 0, 0], a);
+}
+// A camera whose attitude tracks the hole; this is not a gyroscope-transport model.
+export function observerCamera(
+  position: Vector3,
+  observer: FourVector,
+  a: number,
+): Camera {
+  const g = covariantMetric(position, a);
   const dot = (v: FourVector, w: FourVector) =>
     v.reduce(
       (sum, x, i) => sum + x * g[i].reduce((s, y, j) => s + y * w[j], 0),
@@ -35,12 +44,11 @@ export function makeCamera(
     );
   const lower = (v: FourVector) =>
     g.map((row) => row.reduce((s, x, i) => s + x * v[i], 0)) as FourVector;
-  const observer: FourVector = [1 / Math.sqrt(-g[0][0]), 0, 0, 0];
   const basis: FourVector[] = [];
   for (const direction of [
     position.map((x) => -x),
-    [1, 0, 0],
-    [0, -Math.cos(theta), Math.sin(theta)],
+    [position[1], -position[0], 0],
+    [0, 0, 1],
   ]) {
     let v = [0, ...direction] as FourVector;
     const timeProjection = dot(v, observer);
@@ -71,7 +79,7 @@ export function cameraRay(
   const px = 0.38 * (c * x + s * y),
     py = 0.38 * (-s * x + c * y),
     norm = Math.sqrt(1 + px * px + py * py);
-  // Past-directed unit-frequency photon in the static observer's tetrad.
+  // Past-directed unit-frequency photon in the observer's tetrad.
   const p = camera.observer.map(
     (v, i) =>
       -v +

@@ -27,7 +27,8 @@ Ray advance(Ray r,float h){Flow a=flow(r),b=flow(shifted(r,a,.5*h)),c=flow(shift
 float constraint(Ray r){Field f=field(r.x);float k=-r.pt+dot(f.l,r.p);return .5*(-r.pt*r.pt+dot(r.p,r.p))-f.H*k*k;}
 Transport trace(Ray ray){
  float horizon=1.+sqrt(1.-spin*spin),initialLz=ray.x.x*ray.p.y-ray.x.y*ray.p.x,maxNull=0.,maxLz=0.;
- for(int i=0;i<900;i++){
+ for(int i=0;i<1800;i++){
+  if(float(i)>=900./stepScale)return Transport(vec4(0.,0.,0.,3.),vec4(maxNull,maxLz,float(i),0.));
   Field f=field(ray.x);Flow d=flow(ray);float speed=max(length(d.x),1.);
   if(f.r<horizon+.025)return Transport(vec4(0.),vec4(maxNull,maxLz,float(i),f.r));
   if(f.r>100.)return Transport(vec4(normalize(d.x),2.),vec4(maxNull,maxLz,float(i),f.r));
@@ -49,7 +50,7 @@ Transport trace(Ray ray){
   }
   ray=next;
  }
- return Transport(vec4(0.,0.,0.,3.),vec4(maxNull,maxLz,900.,0.));
+ return Transport(vec4(0.,0.,0.,3.),vec4(maxNull,maxLz,1800.,0.));
 }
 `;
 export const fullscreenVertex = `#version 300 es

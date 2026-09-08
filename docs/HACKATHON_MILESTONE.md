@@ -1,5 +1,7 @@
 # Hackathon milestone: a human viewpoint on Kerr spacetime
 
+Historical scope: superseded in part by [the Vesper release checkpoint](VESPER_CHECKPOINT.md), which adds actual timelike descent and a moving camera. Station-keeping-only statements below describe the earlier milestone.
+
 ## Pitch
 
 Explore a rotating black hole from a probe, in your browser. Real general-relativistic light paths reveal the warped sky and accretion disk; a human-scale craft and physical clocks make the immense distances and different rates of elapsed time tangible. The project uses a numerically checked GPU solver and caches stationary light transport to make demanding physics accessible without a server GPU.

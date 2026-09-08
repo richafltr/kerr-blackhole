@@ -1,4 +1,4 @@
-import { makeCamera, isco } from './camera.ts';
+import { makeCamera, isco, type Camera } from './camera.ts';
 import type { KerrState } from './kerr.ts';
 import { fullscreenVertex, transportFragment } from './kerr-glsl.ts';
 import { shadeFragment, displayFragment } from './shading-glsl.ts';
@@ -10,6 +10,8 @@ export type View = {
   distance: number;
   quality: number;
   spin: number;
+  camera?: Camera;
+  moving?: boolean;
 };
 export const defaultView: View = {
   inclination: 77,
@@ -128,11 +130,12 @@ export function createRenderer(canvas: HTMLCanvasElement) {
     }
   }
   function setTransport(view: View) {
-    const camera = makeCamera(view.distance, view.inclination, view.spin);
+    const camera =
+      view.camera ?? makeCamera(view.distance, view.inclination, view.spin);
     gl.useProgram(transport);
     gl.uniform1f(tu.spin, view.spin);
     gl.uniform1f(tu.innerRadius, isco(view.spin));
-    gl.uniform1f(tu.stepScale, 1);
+    gl.uniform1f(tu.stepScale, view.camera ? 0.5 : 1);
     gl.uniform1i(tu.diagnostics, 0);
     gl.uniform1i(tu.includeDisk, 1);
     gl.uniform1i(tu.initialX, 3);
@@ -153,7 +156,9 @@ export function createRenderer(canvas: HTMLCanvasElement) {
     const rect = canvas.getBoundingClientRect(),
       ratio = rect.width / Math.max(1, rect.height),
       longest = Math.max(rect.width, rect.height),
-      scale = Math.min(1, 1280 / Math.max(1, longest)) * view.quality;
+      scale =
+        Math.min(1, (view.moving ? 640 : 1280) / Math.max(1, longest)) *
+        view.quality;
     const w = Math.max(1, Math.round(rect.width * scale)),
       h = Math.max(1, Math.round(rect.height * scale));
     const key = [
@@ -163,9 +168,16 @@ export function createRenderer(canvas: HTMLCanvasElement) {
       view.inclination,
       view.roll,
       view.spin,
+      ...(view.camera
+        ? [
+            ...view.camera.position,
+            ...view.camera.observer,
+            ...view.camera.forward,
+          ]
+        : []),
     ].join('/');
     if (key !== lastKey) {
-      const lw = Math.max(1, Math.round(Math.min(w, 280))),
+      const lw = Math.max(1, Math.round(Math.min(w, view.moving ? 240 : 280))),
         lh = Math.max(1, Math.round(lw / ratio));
       removeTarget(gl, low);
       removeTarget(gl, high);

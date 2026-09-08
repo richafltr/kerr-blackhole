@@ -1,5 +1,7 @@
 # From a black-hole image to a probe experience
 
+Historical scope: superseded in part by [the Vesper release checkpoint](VESPER_CHECKPOINT.md), which adds actual timelike descent and a moving camera. Station-keeping-only statements below describe the earlier milestone.
+
 Status: the first probe/cabin and scale presentation is implemented on 8 September 2026, with static observer clocks; free fall, received signals, and the onboard infall camera remain planned. Preserve `baseline-kerr-v1` at `1bbcd14`. The immediate milestone is a sense of physical scale; probe dynamics, received signals, and horizon crossing follow separate acceptance gates. Technical explanation stays in this repository. Any in-scene instrumentation should be sparse, purposeful, and owner-directed.
 
 ## References and creative interpretation

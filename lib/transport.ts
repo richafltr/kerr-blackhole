@@ -28,7 +28,7 @@ export function traceTransport(
     maxNull,
     maxLz,
   });
-  for (let i = 0; i < MAX_STEPS; i++) {
+  for (let i = 0; i < Math.ceil(MAX_STEPS / stepScale); i++) {
     const field = kerrField(state.slice(0, 3) as Vector3, a),
       r = field.r;
     if (r < horizon + 0.025) return result(0, [0, 0, 0], i);
@@ -78,5 +78,5 @@ export function traceTransport(
     }
     state = next;
   }
-  return result(3, [0, 0, 0], MAX_STEPS);
+  return result(3, [0, 0, 0], Math.ceil(MAX_STEPS / stepScale));
 }

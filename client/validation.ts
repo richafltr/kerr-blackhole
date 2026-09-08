@@ -1,6 +1,7 @@
 import { createRenderer, defaultView } from '../lib/renderer';
 import { makeCamera, cameraRay } from '../lib/camera';
 import { traceTransport } from '../lib/transport';
+import { releaseProbe, stepFlight, flightCamera } from '../lib/flight';
 import { traceLight } from '../lib/light';
 export async function runValidation(root: HTMLElement) {
   root.innerHTML =
@@ -85,6 +86,51 @@ export async function runValidation(root: HTMLElement) {
     check(
       maxLz < 0.002,
       `Max GPU axial momentum drift, disk/escape=${maxLz.toExponential(3)} (limit 0.002)`,
+    );
+    let movingMismatch = 0,
+      movingHitError = 0,
+      movingShiftError = 0,
+      movingCount = 0;
+    for (const spin of [0, 0.6, 0.9])
+      for (const tau of [75, 150, 179, 250]) {
+        const movingCamera = flightCamera(
+          stepFlight(releaseProbe(30, 77, spin), tau),
+        );
+        const movingRays = [-0.7, 0, 0.7].flatMap((y) =>
+          [-1.2, -0.8, -0.4, 0, 0.4, 0.8, 1.2].map((x) =>
+            cameraRay(movingCamera, x, y),
+          ),
+        );
+        const movingGPU = renderer.diagnose(movingRays, spin, 0.5);
+        movingRays.forEach((ray, i) => {
+          const cpu = traceTransport(ray.state, ray.pt, spin, 0.5),
+            data = movingGPU.data.slice(i * 4, i * 4 + 4);
+          movingCount++;
+          if (Math.round(data[3]) !== cpu.status || cpu.status >= 3)
+            movingMismatch++;
+          if (cpu.status === 1 && Math.round(data[3]) === 1) {
+            movingHitError = Math.max(
+              movingHitError,
+              Math.hypot(data[0] - cpu.data[0], data[1] - cpu.data[1]),
+            );
+            movingShiftError = Math.max(
+              movingShiftError,
+              Math.abs(data[2] - cpu.data[2]),
+            );
+          }
+        });
+      }
+    check(
+      movingMismatch === 0,
+      `${movingCount} infalling-camera classifications, including near endpoint; mismatches/invalid=${movingMismatch}`,
+    );
+    check(
+      movingHitError < 0.01,
+      `Infalling-camera disk-hit error=${movingHitError.toExponential(3)} M (limit .01)`,
+    );
+    check(
+      movingShiftError < 0.002,
+      `Infalling-camera frequency-ratio error=${movingShiftError.toExponential(3)} (limit .002)`,
     );
     const camera = makeCamera(30, 77, 0);
     const critical = 3 * Math.sqrt(3);
