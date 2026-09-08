@@ -4,7 +4,7 @@
 
 An interactive exterior encounter with a rotating black hole. From a first-person cabin, choose release and follow a timelike Kerr trajectory while the GPU computes light paths from the moving observer. Switch between cabin, nearby chase camera, and unobstructed optics using the bottom-right controls.
 
-The current build uses **WebGL2**, with direct GLSL for general-relativistic light transport and Three.js for original faceted spacecraft and a segmented ring carrier. A generated cabin foreground surrounds the live simulation. Motion uses a lower-resolution preview and 2400× time-lapse playback after the initial release. The journey stops outside the horizon; it does not simulate a singularity or quantum gravity.
+The current build uses **WebGL2**, with direct GLSL for general-relativistic light transport and Three.js for the textured NASA capsule and an original segmented ring carrier. A generated cabin foreground surrounds the live simulation. Motion uses a lower-resolution preview and 2400× time-lapse playback after the initial release. The journey stops outside the horizon; it does not simulate a singularity or quantum gravity.
 
 [Descent research and current game scope](docs/DESCENT_RESEARCH.md) · [Preserved checkpoint, physical scope, and limitations](docs/VESPER_CHECKPOINT.md) · [Assets and attribution](docs/ASSETS.md) · [Original GPU validation](docs/VALIDATION.md)
 

@@ -16,16 +16,6 @@ export function createVessels() {
     roughness: 0.5,
     metalness: 0.7,
   });
-  const window = new THREE.MeshStandardMaterial({
-    color: 0x0b1417,
-    roughness: 0.16,
-    metalness: 0.82,
-  });
-  const gold = new THREE.MeshStandardMaterial({
-    color: 0x9c7545,
-    roughness: 0.65,
-    metalness: 0.6,
-  });
   const lamp = new THREE.MeshStandardMaterial({
     color: 0xffd696,
     emissive: 0xe1aa57,
@@ -89,68 +79,11 @@ export function createVessels() {
   const hub = mesh(carrier, new THREE.CylinderGeometry(2.8, 2.8, 7, 12), hull);
   hub.rotation.x = Math.PI / 2;
   mesh(carrier, new THREE.TorusGeometry(2.4, 0.25, 6, 24), shadow, 0, 0, 3.6);
-  const probe = new THREE.Group();
-  // Broad, faceted lifting-body capsule with a chamfered nose and panel seams.
-  const outline = new THREE.Shape();
-  outline.moveTo(-2.8, -5);
-  outline.lineTo(2.8, -5);
-  outline.lineTo(3.4, 1.8);
-  outline.lineTo(1.9, 5);
-  outline.lineTo(-1.9, 5);
-  outline.lineTo(-3.4, 1.8);
-  outline.closePath();
-  const body = mesh(
-    probe,
-    new THREE.ExtrudeGeometry(outline, {
-      depth: 1.5,
-      bevelEnabled: true,
-      bevelSize: 0.35,
-      bevelThickness: 0.35,
-      bevelSegments: 1,
-      steps: 1,
-    }),
-    hull,
-  );
-  body.rotation.x = -Math.PI / 2;
-  box(probe, 5.5, 0.35, 7.8, shadow, 0, -0.15, -0.5);
-  const cockpit = box(probe, 3.5, 0.65, 2.8, shadow, 0, 1.8, -2.8);
-  cockpit.rotation.x = 0.18;
-  for (const side of [-1, 1]) {
-    const glass = box(probe, 1.45, 0.07, 2.3, window, side * 0.88, 2.17, -2.75);
-    glass.rotation.x = 0.18;
-    for (let j = 0; j < 7; j++)
-      box(probe, 0.035, 0.045, 0.95, metal, side * 2.7, 1.88, -1.2 + j * 0.7);
-    box(probe, 0.6, 0.4, 2.2, gold, side * 2.7, 0.9, 3.4);
-    const nozzle = mesh(
-      probe,
-      new THREE.CylinderGeometry(0.6, 0.8, 1.1, 12, 1, true),
-      shadow,
-      side * 1.7,
-      0.75,
-      5.2,
-    );
-    nozzle.rotation.x = Math.PI / 2;
-    mesh(
-      probe,
-      new THREE.TorusGeometry(0.73, 0.1, 6, 16),
-      metal,
-      side * 1.7,
-      0.75,
-      5.75,
-    );
-    box(probe, 0.15, 0.15, 0.5, lamp, side * 3.1, 0.6, -2.4);
-    for (let j = 0; j < 8; j++)
-      box(probe, 1.4, 0.035, 0.06, metal, side * 1.6, 1.87, 0.2 + j * 0.5);
-  }
-  box(probe, 0.12, 0.05, 7, metal, 0, 1.89, 0.3);
-  for (let j = 0; j < 4; j++)
-    box(probe, 4.8, 0.04, 0.055, shadow, 0, 1.9, j * 1.2);
   return {
-    probe,
     carrier,
     dispose() {
       geometries.forEach((g) => g.dispose());
-      [hull, shadow, metal, window, gold, lamp].forEach((m) => m.dispose());
+      [hull, shadow, metal, lamp].forEach((m) => m.dispose());
     },
   };
 }

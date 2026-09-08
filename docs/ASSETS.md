@@ -16,4 +16,4 @@ NASA's [media usage guidelines](https://www.nasa.gov/nasa-brand-center/images-an
 
 ## Ad Astra spacecraft revision
 
-The current game uses original procedural geometry in `lib/vessels.ts`: a twelve-module ring carrier and a faceted probe with panel lines, dark glazing, metal bands and engine bells. Its design uses the supplied film references for broad shape/palette only. No film models, textures, dialogue, score or footage are bundled. The NASA Apollo–Soyuz asset remains preserved in the repository and `baseline-vesper-v1`, but is no longer loaded by the current renderer.
+The current game combines the NASA Apollo capsule from the preserved checkpoint with an original twelve-module ring carrier (`lib/vessels.ts`). The supplied silhouette and film references inform the carrier shape and palette. No film models, textures, dialogue, score or footage are bundled. The Apollo capsule remains a detailed stand-in, not a reproduction of the film’s Ranger. The Soyuz part of the NASA asset is not displayed in this version.
