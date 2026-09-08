@@ -10,6 +10,25 @@ The committed [objective](docs/OBJECTIVE.md) separates achieved capabilities fro
 
 The expensive light transport is cached. Camera or spin changes produce a coarse preview and then refine the image in tiles; disk animation and exposure reuse the completed paths. [Measured validation](docs/VALIDATION.md) compares actual GPU readback with the float64 reference.
 
+## Preserved baseline — 8 September 2026
+
+**Checkpoint:** [`baseline-kerr-v1`](https://github.com/richafltr/kerr-blackhole/tree/baseline-kerr-v1), an annotated tag at commit `1bbcd14`, preserved on GitHub before probe work.
+
+This milestone delivers real GPU Kerr null-geodesic transport, a tetrad camera, relativistic frequency shifts, progressive spatial refinement, and reusable stationary transport on consumer hardware. Eighteen CPU tests and the production GPU/reference suite passed; all 140 sampled rays agreed in classification. It is a checked numerical rendering baseline, with the finite sampling and emission limitations recorded in [validation](docs/VALIDATION.md).
+
+To inspect or rebuild it without changing current work:
+
+```sh
+git worktree add --detach ../kerr-blackhole-baseline baseline-kerr-v1
+cd ../kerr-blackhole-baseline
+npm ci
+npm run build:vercel
+```
+
+A production rollback is a separate deployment action: deploy that checkout to the existing Vercel project if needed. The tag preserves source and the dependency lockfile, not a guarantee that hosting URLs or future build infrastructure remain unchanged.
+
+**Next scoped milestone:** [Establish scale, then launch a probe](docs/PROBE_EXPERIENCE_SCOPE.md). This is an architecture proposal; no probe, infall camera, or mission clocks are implemented in this checkpoint. The simulation interface stays visual-first.
+
 ## Run
 
 Node 22.13+ and npm; developed using Node 25.4.0.
