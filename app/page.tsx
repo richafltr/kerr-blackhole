@@ -16,7 +16,14 @@ import {
   type PrologueShot,
 } from './mission-intro';
 import { makeCamera } from '@/lib/camera';
-import { tidalStretch } from '@/lib/tides';
+import { tidalStretch, tidalTensor } from '@/lib/tides';
+import { loadFlightPath, sampleFlightPath } from '@/lib/flight-path';
+import {
+  newNavigation,
+  stepNavigation,
+  type Navigation,
+  type Input,
+} from '@/lib/navigation';
 import { Slider } from '@/components/ui/slider';
 import { createRenderer, defaultView, type View } from '@/lib/renderer';
 import {
@@ -47,7 +54,111 @@ export default function Page() {
   const [playing, setPlaying] = useState(false),
     [controls, setControls] = useState(false),
     [error, setError] = useState('');
-  const [phase, setPhase] = useState<'hold' | 'armed' | 'fall' | 'end'>('hold');
+  type Phase =
+    | 'hold'
+    | 'armed'
+    | 'fall'
+    | 'threshold'
+    | 'memory'
+    | 'lost'
+    | 'home';
+  const [phase, setPhase] = useState<Phase>('hold');
+  const phaseRef = useRef<Phase>('hold');
+  const navigation = useRef<Navigation | undefined>(undefined);
+  const inputs = useRef<Input>({ x: 0, y: 0, brake: false });
+  const trajectory = useRef<Flight[]>([]);
+  const localTide = useRef([
+    [0, 0],
+    [0, 0],
+  ]);
+  const [pilot, setPilot] = useState({
+    hull: 3,
+    fuel: 70,
+    x: 0,
+    y: 0,
+    flash: 0,
+    active: false,
+    gates: 0,
+  });
+  const changePhase = (next: Phase) => {
+    phaseRef.current = next;
+    setPhase(next);
+  };
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+  useEffect(() => {
+    let cancelled = false;
+    trajectory.current = [];
+    void loadFlightPath(view.distance, view.inclination, view.spin)
+      .then((path) => {
+        if (!cancelled) trajectory.current = path;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [view.distance, view.inclination, view.spin]);
+  useEffect(() => {
+    const keys = new Set<string>();
+    const sync = () => {
+      inputs.current = {
+        x:
+          Number(keys.has('d') || keys.has('arrowright')) -
+          Number(keys.has('a') || keys.has('arrowleft')),
+        y:
+          Number(keys.has('w') || keys.has('arrowup')) -
+          Number(keys.has('s') || keys.has('arrowdown')),
+        brake: keys.has(' '),
+      };
+    };
+    const down = (e: KeyboardEvent) => {
+      if (
+        [
+          'w',
+          'a',
+          's',
+          'd',
+          'arrowup',
+          'arrowdown',
+          'arrowleft',
+          'arrowright',
+          ' ',
+        ].includes(e.key.toLowerCase()) &&
+        ['fall', 'memory'].includes(phaseRef.current)
+      ) {
+        e.preventDefault();
+        keys.add(e.key.toLowerCase());
+        sync();
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      keys.delete(e.key.toLowerCase());
+      sync();
+    };
+    const clear = () => {
+      keys.clear();
+      sync();
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', clear);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', clear);
+    };
+  }, []);
+  useEffect(() => {
+    if (phase !== 'threshold' || !playing) return;
+    const timer = window.setTimeout(() => {
+      inputs.current = { x: 0, y: 0, brake: false };
+      navigation.current = newNavigation('memory');
+      changePhase('memory');
+      setPlaying(true);
+    }, 3200);
+    return () => clearTimeout(timer);
+  }, [phase, playing]);
   const [telemetry, setTelemetry] = useState({
     local: 0,
     reference: 0,
@@ -89,6 +200,8 @@ export default function Page() {
       lastTelemetry = 0,
       lastCamera = 0,
       flightWall = 0,
+      introProper = 0,
+      archiveIndex = 0,
       key = '';
     let movingView: View | undefined;
     let releasePosition: number[] | undefined;
@@ -105,6 +218,9 @@ export default function Page() {
           local = 0;
           last = 0;
           flightWall = 0;
+          introProper = 0;
+          archiveIndex = 0;
+          probe!.clearMemories();
           movingView = undefined;
           releasePosition = flight.current
             ? flight.current.state.slice(0, 3)
@@ -114,24 +230,64 @@ export default function Page() {
         const dt =
           last && !paused.current ? Math.min(0.25, (now - last) / 1000) : 0;
         last = now;
+        if (
+          navigation.current &&
+          !navigation.current.complete &&
+          !navigation.current.failed
+        ) {
+          navigation.current = stepNavigation(
+            navigation.current,
+            dt,
+            inputs.current,
+            localTide.current,
+          );
+          if (navigation.current.failed) {
+            phaseRef.current = 'lost';
+            setPhase('lost');
+          } else if (
+            navigation.current.complete &&
+            navigation.current.kind === 'memory'
+          ) {
+            phaseRef.current = 'home';
+            setPhase('home');
+          }
+        }
         let warp = 1;
         if (flight.current) {
           flightWall += dt;
-          warp = flightWall < 4 ? 1 : 2400;
+          if (
+            flight.current.radius <= 8 &&
+            !navigation.current &&
+            phaseRef.current === 'fall'
+          )
+            navigation.current = newNavigation('exterior');
+          warp =
+            flightWall < 4 ||
+            (navigation.current && !navigation.current.complete)
+              ? 1
+              : 2400;
           const wasComplete = flight.current.complete;
-          flight.current = stepFlight(flight.current, (dt * warp) / tg);
+          if (phaseRef.current === 'fall')
+            flight.current = stepFlight(flight.current, (dt * warp) / tg);
           const f = flight.current;
           local = f.properTime * tg;
           time = f.coordinateTime * tg;
-          if (!wasComplete && f.complete) setPhase('end');
+          if (!wasComplete && f.complete) {
+            phaseRef.current = 'threshold';
+            setPhase('threshold');
+          }
           if (
             !movingView ||
-            now - lastCamera >= 100 ||
+            now - lastCamera >= 150 ||
             (!wasComplete && f.complete)
           ) {
             movingView = {
               ...v,
-              camera: flightCamera(f),
+              camera: flightCamera(
+                trajectory.current.length
+                  ? sampleFlightPath(trajectory.current, f.properTime)
+                  : f,
+              ),
               moving: !f.complete && !paused.current,
               quality: Math.min(v.quality, 0.8),
             };
@@ -141,8 +297,17 @@ export default function Page() {
           time += dt;
           local += dt * staticClockRate(v.distance, v.inclination, v.spin);
         }
-        const active = movingView ? { ...movingView, exposure: v.exposure } : v;
-        renderer!.render(time / (6 * tg), active);
+        let active = movingView ? { ...movingView, exposure: v.exposure } : v;
+        if (introFrame.current?.time && trajectory.current.length) {
+          introProper = Math.min(145, (introFrame.current.time / 57.932) * 145);
+          const staged = sampleFlightPath(trajectory.current, introProper);
+          active = { ...v, camera: flightCamera(staged), moving: true };
+        }
+        if (!['threshold', 'memory', 'home', 'lost'].includes(phaseRef.current))
+          renderer!.render(
+            (introFrame.current ? introProper : time / tg) / 6,
+            active,
+          );
         const separation =
           flight.current && releasePosition
             ? Math.hypot(
@@ -153,8 +318,43 @@ export default function Page() {
           mode.current === 'onboard' ? 'optics' : mode.current,
           separation,
           introFrame.current,
+          navigation.current &&
+            (!navigation.current.complete ||
+              navigation.current.kind === 'memory')
+            ? navigation.current
+            : undefined,
         );
+        if (
+          phaseRef.current === 'fall' &&
+          flight.current &&
+          archiveIndex < 6 &&
+          flight.current.properTime >= [0, 20, 60, 100, 145, 175][archiveIndex]
+        ) {
+          probe!.remember(canvas.current!, local);
+          archiveIndex++;
+        }
         if (now - lastTelemetry > 200) {
+          const nav = navigation.current;
+          setPilot({
+            hull: nav?.hull ?? 3,
+            fuel: nav?.fuel ?? 70,
+            x: nav?.x ?? 0,
+            y: nav?.y ?? 0,
+            flash: nav?.flash ?? 0,
+            active: !!nav && !nav.complete && !nav.failed,
+            gates: nav?.gates ?? 0,
+          });
+          if (nav?.kind === 'exterior' && !nav.complete && flight.current) {
+            const tensor = tidalTensor(flightCamera(flight.current), v.spin);
+            localTide.current = [
+              [tensor[1][1] / (tg * tg), tensor[1][2] / (tg * tg)],
+              [tensor[2][1] / (tg * tg), tensor[2][2] / (tg * tg)],
+            ];
+          } else
+            localTide.current = [
+              [0, 0],
+              [0, 0],
+            ];
           setTelemetry({
             local,
             reference: time,
@@ -184,13 +384,17 @@ export default function Page() {
   const restart = () => {
     flight.current = null;
     reset.current++;
-    setPhase('hold');
+    navigation.current = undefined;
+    inputs.current = { x: 0, y: 0, brake: false };
+    changePhase('hold');
     setPlaying(true);
   };
   const release = () => {
     flight.current = releaseProbe(view.distance, view.inclination, view.spin);
     reset.current++;
-    setPhase('fall');
+    navigation.current = undefined;
+    inputs.current = { x: 0, y: 0, brake: false };
+    changePhase('fall');
     setPlaying(true);
     setControls(false);
   };
@@ -212,7 +416,9 @@ export default function Page() {
         aria-label="Exterior probe camera"
       />
       {((intro && introShot === 'cabin') ||
-        (!intro && perspective === 'onboard')) && (
+        (!intro &&
+          perspective === 'onboard' &&
+          !['memory', 'home', 'lost'].includes(phase))) && (
         <img
           className="cabin-art"
           src="/assets/cabin-v2.png"
@@ -227,8 +433,8 @@ export default function Page() {
           <span>
             {phase === 'fall'
               ? 'FREE FALL'
-              : phase === 'end'
-                ? 'EXTERIOR LIMIT'
+              : phase === 'home'
+                ? 'TRANSMISSION RECEIVED'
                 : 'AWAITING COMMAND'}
           </span>
         </header>
@@ -246,50 +452,52 @@ export default function Page() {
             <span className="timewarp">TIME LAPSE ×2400</span>
           )}
         </div>
-        {!intro && perspective === 'onboard' && (
-          <div className="console-choice">
-            {phase === 'hold' || phase === 'armed' ? (
-              <>
-                <span className="choice-eyebrow">
-                  {phase === 'armed' ? 'RETURN SEAT → MARA' : 'ONE SEAT HOME'}
-                </span>
-                <button
-                  className="release"
-                  onClick={() =>
-                    phase === 'hold' ? setPhase('armed') : release()
-                  }
-                >
-                  {phase === 'armed' ? 'RELEASE VESPER' : 'TAKE THE DESCENT'}
-                </button>
-                {phase === 'armed' && (
-                  <button className="remain" onClick={() => setPhase('hold')}>
-                    ABORT RELEASE
+        {!intro &&
+          perspective === 'onboard' &&
+          !['threshold', 'memory', 'home', 'lost'].includes(phase) && (
+            <div className="console-choice">
+              {phase === 'hold' || phase === 'armed' ? (
+                <>
+                  <span className="choice-eyebrow">
+                    {phase === 'armed' ? 'RETURN SEAT → MARA' : 'ONE SEAT HOME'}
+                  </span>
+                  <button
+                    className="release"
+                    onClick={() =>
+                      phase === 'hold' ? setPhase('armed') : release()
+                    }
+                  >
+                    {phase === 'armed' ? 'RELEASE VESPER' : 'TAKE THE DESCENT'}
                   </button>
-                )}
-              </>
-            ) : phase === 'end' ? (
-              <>
-                <span className="choice-eyebrow">EXTERIOR LIMIT</span>
-                <button className="release" onClick={restart}>
-                  BEGIN AGAIN
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="choice-eyebrow">SEAT ASSIGNED / MARA</span>
-                <strong className="flight-clock">
-                  {clockDisplay(telemetry.local)}
-                </strong>
-              </>
-            )}
-          </div>
-        )}
-        {perspective !== 'onboard' && phase === 'end' && (
-          <button className="exterior-restart" onClick={restart}>
-            BEGIN AGAIN
-          </button>
-        )}
-        <nav className="view-dock" aria-label="Camera views">
+                  {phase === 'armed' && (
+                    <button className="remain" onClick={() => setPhase('hold')}>
+                      ABORT RELEASE
+                    </button>
+                  )}
+                </>
+              ) : phase === 'home' ? (
+                <>
+                  <span className="choice-eyebrow">EXTERIOR LIMIT</span>
+                  <button className="release" onClick={restart}>
+                    BEGIN AGAIN
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="choice-eyebrow">SEAT ASSIGNED / MARA</span>
+                  <strong className="flight-clock">
+                    {clockDisplay(telemetry.local)}
+                  </strong>
+                </>
+              )}
+            </div>
+          )}
+
+        <nav
+          hidden={['threshold', 'memory', 'home', 'lost'].includes(phase)}
+          className="view-dock"
+          aria-label="Camera views"
+        >
           {(
             [
               { mode: 'onboard', label: '01 / CABIN', Icon: ScanLine },
@@ -391,8 +599,7 @@ export default function Page() {
                   max={c.max}
                   step={c.step}
                   disabled={
-                    (phase === 'fall' || phase === 'end') &&
-                    c.key !== 'exposure'
+                    !['hold', 'armed'].includes(phase) && c.key !== 'exposure'
                   }
                   value={[view[c.key]]}
                   onValueChange={(v) => update(c.key, v)}
@@ -402,6 +609,108 @@ export default function Page() {
           </section>
         )}
       </div>
+      {(phase === 'fall' || phase === 'memory') && (
+        <>
+          <div className="pilot-status">
+            <span>
+              {pilot.hull > 1 ? 'HULL' : 'HULL CRITICAL'}{' '}
+              {'Ⅰ'.repeat(Math.max(0, pilot.hull))}
+            </span>
+            <span>ΔV {pilot.fuel.toFixed(0)}</span>
+            <span>
+              {phase === 'memory'
+                ? `FOLLOW THE LIGHT / ${pilot.gates + 1}`
+                : pilot.active
+                  ? 'WASD / STEER · SPACE / BRAKE'
+                  : telemetry.warp > 1
+                    ? 'COAST / TIME LAPSE ×2400'
+                    : 'COAST'}
+            </span>
+            {(Math.abs(pilot.x) > 20 || Math.abs(pilot.y) > 16) && (
+              <span>OFF VECTOR</span>
+            )}
+          </div>
+          {pilot.active && (
+            <div className="touch-flight">
+              <div
+                className="steering-pad"
+                aria-label="Drag to steer"
+                role="application"
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  const r = e.currentTarget.getBoundingClientRect();
+                  inputs.current.x =
+                    (e.clientX - r.left - r.width / 2) / (r.width / 2);
+                  inputs.current.y =
+                    -(e.clientY - r.top - r.height / 2) / (r.height / 2);
+                }}
+                onPointerMove={(e) => {
+                  if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+                  const r = e.currentTarget.getBoundingClientRect();
+                  inputs.current.x = Math.max(
+                    -1,
+                    Math.min(
+                      1,
+                      (e.clientX - r.left - r.width / 2) / (r.width / 2),
+                    ),
+                  );
+                  inputs.current.y = Math.max(
+                    -1,
+                    Math.min(
+                      1,
+                      -(e.clientY - r.top - r.height / 2) / (r.height / 2),
+                    ),
+                  );
+                }}
+                onPointerUp={() => {
+                  inputs.current.x = inputs.current.y = 0;
+                }}
+                onPointerCancel={() => {
+                  inputs.current.x = inputs.current.y = 0;
+                }}
+              >
+                ＋
+              </div>
+              <button
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  inputs.current.brake = true;
+                }}
+                onPointerUp={() => {
+                  inputs.current.brake = false;
+                }}
+                onPointerCancel={() => {
+                  inputs.current.brake = false;
+                }}
+              >
+                BRAKE
+              </button>
+            </div>
+          )}
+          <div
+            className="impact-glass"
+            style={{ opacity: pilot.flash * 0.65 }}
+            aria-hidden="true"
+          />
+        </>
+      )}
+      {phase === 'threshold' && (
+        <div className="chapter-threshold">
+          <span>SPECULATIVE INTERIOR</span>
+          <p>Beyond the model.</p>
+        </div>
+      )}
+      {(phase === 'home' || phase === 'lost') && (
+        <div className="mission-ending">
+          <span>
+            {phase === 'home' ? 'TRANSMISSION RECEIVED' : 'SIGNAL LOST'}
+          </span>
+          <h2>{phase === 'home' ? 'Somewhere. Somewhen.' : 'Vesper.'}</h2>
+          <button className="intro-primary" onClick={restart}>
+            {phase === 'home' ? 'PLAY AGAIN' : 'RETRY'}
+          </button>
+        </div>
+      )}
       <MissionIntro
         active={intro}
         phase={phase}

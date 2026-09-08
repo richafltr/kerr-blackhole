@@ -11,8 +11,7 @@ vec3 blackbody(float temperature){
  vec3 wavelength=vec3(.65,.55,.45);
  return .22/(pow(wavelength,vec3(5.))*(exp(min(vec3(80.),14388./(wavelength*temperature)))-1.));
 }
-void main(){
- vec2 uv=gl_FragCoord.xy/resolution;vec4 transport=texture(transportMap,uv);if(transport.w<-.5)transport=texture(previewMap,uv);
+vec3 emissionAt(vec4 transport){
  vec3 radiance=vec3(0.);
  if(transport.w>.5&&transport.w<1.5){
   float r=sqrt(max(.01,dot(transport.xy,transport.xy)-spin*spin)),azimuth=atan(transport.y,transport.x);
@@ -25,7 +24,21 @@ void main(){
   vec2 cell=floor(sky*vec2(1400.,700.)),f=fract(sky*vec2(1400.,700.));float h=hash(cell);
   float star=exp(-dot(f-.5,f-.5)*80.)*step(.997,h);radiance=vec3(.65,.77,1.)*star*.8;
  }
- color=vec4(radiance,1.);
+ return radiance;
+}
+vec3 filteredPreview(vec2 uv){
+ // Filter emitted radiance, never classification IDs or disk/sky coordinates across a boundary.
+ vec2 size=vec2(textureSize(previewMap,0)), p=uv*size-.5, f=fract(p);
+ ivec2 q=ivec2(floor(p)), hi=ivec2(size)-1;
+ vec3 a=emissionAt(texelFetch(previewMap,clamp(q,ivec2(0),hi),0));
+ vec3 b=emissionAt(texelFetch(previewMap,clamp(q+ivec2(1,0),ivec2(0),hi),0));
+ vec3 c=emissionAt(texelFetch(previewMap,clamp(q+ivec2(0,1),ivec2(0),hi),0));
+ vec3 d=emissionAt(texelFetch(previewMap,clamp(q+ivec2(1,1),ivec2(0),hi),0));
+ return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
+}
+void main(){
+ vec2 uv=gl_FragCoord.xy/resolution;vec4 t=texture(transportMap,uv);
+ color=vec4(t.w<-.5?filteredPreview(uv):emissionAt(t),1.);
 }`;
 export const displayFragment = `#version 300 es
 precision highp float;

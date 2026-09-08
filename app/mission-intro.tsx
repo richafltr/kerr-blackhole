@@ -9,7 +9,11 @@ export type PrologueShot =
   | 'carrier'
   | 'probe'
   | 'cabin';
-export type PrologueFrame = { shot: PrologueShot; progress: number };
+export type PrologueFrame = {
+  shot: PrologueShot;
+  progress: number;
+  time?: number;
+};
 export function MissionIntro({
   active,
   phase,
@@ -25,7 +29,7 @@ export function MissionIntro({
 }) {
   const [begun, setBegun] = useState(false);
   const [paused, setPaused] = useState(false);
-  const [voice, setVoice] = useState(true);
+  const voice = true;
   const [music, setMusic] = useState(true);
   const [elapsed, setElapsed] = useState(0);
   const [audioError, setAudioError] = useState('');
@@ -85,6 +89,7 @@ export function MissionIntro({
       if (active)
         onFrame({
           shot: current.shot as PrologueShot,
+          time: seconds,
           progress: reducedMotion.current ? 0 : progress,
         });
       sound.current?.duckVoice(
@@ -112,10 +117,6 @@ export function MissionIntro({
     id = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(id);
   }, [begun, active, onFrame]);
-  const toggleVoice = () => {
-    if (sound.current) sound.current.voiceEnabled = !voice;
-    setVoice(!voice);
-  };
   const toggleMusic = () => {
     if (sound.current) sound.current.musicEnabled = !music;
     setMusic(!music);
@@ -126,9 +127,6 @@ export function MissionIntro({
         <button aria-pressed={music} onClick={toggleMusic}>
           SCORE {music ? 'ON' : 'OFF'}
         </button>
-        <a href="/credits.html" target="_blank" rel="noreferrer">
-          CREDITS
-        </a>
         {audioError && (
           <button onClick={() => sound.current?.retry()}>RETRY AUDIO</button>
         )}
@@ -139,31 +137,22 @@ export function MissionIntro({
       className={`mission-intro ${!begun ? 'title-sequence' : `film-sequence shot-${cue.shot}`} ${ready ? 'handoff' : ''}`}
       aria-label="Mission entrance"
     >
-      <div className="intro-meta">
-        <span>VESPER / FLIGHT ARCHIVE</span>
-        <span>CHAPTER I</span>
-      </div>
       {!begun ? (
         <div className="title-lockup">
           <h1>
             interstellar<span>: ad astra</span>
           </h1>
           <button className="intro-primary" onClick={start}>
-            BEGIN TRANSMISSION <span>↗</span>
+            PLAY <span>▷</span>
           </button>
           <button className="intro-skip" onClick={enter}>
-            ENTER WITHOUT BRIEFING
+            SKIP INTRO
           </button>
         </div>
       ) : (
         <>
           <div className="film-letterbox" aria-hidden="true" />
           <div className="film-caption" key={cue.start}>
-            {cue.shot === 'black' && (
-              <span className="film-cue-number">
-                {String(index + 1).padStart(2, '0')} / TRANSMISSION
-              </span>
-            )}
             <p ref={subtitle} aria-hidden="true" />
             <span className="sr-only" aria-live="polite">
               {cue.text}
@@ -187,19 +176,6 @@ export function MissionIntro({
           </div>
         </>
       )}
-      <footer className="intro-footer">
-        <a href="/credits.html" target="_blank" rel="noreferrer">
-          SOUND / elevenlabs.io · SCOTT BUCKLEY
-        </a>
-        <div>
-          <button aria-pressed={voice} onClick={toggleVoice}>
-            VOICE {voice ? 'ON' : 'OFF'}
-          </button>
-          <button aria-pressed={music} onClick={toggleMusic}>
-            SCORE {music ? 'ON' : 'OFF'}
-          </button>
-        </div>
-      </footer>
       {audioError && (
         <button className="audio-retry" onClick={() => sound.current?.retry()}>
           RETRY AUDIO / {audioError}

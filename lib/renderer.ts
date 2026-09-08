@@ -76,7 +76,12 @@ export function createRenderer(canvas: HTMLCanvasElement) {
   ]);
   const du = locate(display, ['resolution', 'exposure', 'emission']);
   const timer = gl.getExtension('EXT_disjoint_timer_query_webgl2');
-  const pending: { query: WebGLQuery; kind: 'transport' | 'shade' }[] = [];
+  const pending: {
+    query: WebGLQuery;
+    kind: 'transport' | 'shade';
+    pixels: number;
+  }[] = [];
+  let transportMsPerPixel = 0;
   const stats: RenderStats = {
     transportPasses: 0,
     cachedFrames: 0,
@@ -92,11 +97,23 @@ export function createRenderer(canvas: HTMLCanvasElement) {
     hdr: Target | null = null,
     lastKey = '',
     row = 0;
+  type Cached = { low: Target; high: Target; hdr: Target; row: number };
+  const cache = new Map<string, Cached>();
+  const cacheBudget = 32 * 1024 * 1024;
+  const bytes = (entry: Cached) =>
+    entry.low.w * entry.low.h * 16 + entry.high.w * entry.high.h * 24;
+  const cacheBytes = () =>
+    [...cache.values()].reduce((sum, entry) => sum + bytes(entry), 0);
+  const free = (entry: Cached) => {
+    removeTarget(gl, entry.low);
+    removeTarget(gl, entry.high);
+    removeTarget(gl, entry.hdr);
+  };
   function bindTexture(unit: number, t: WebGLTexture) {
     gl.activeTexture(gl.TEXTURE0 + unit);
     gl.bindTexture(gl.TEXTURE_2D, t);
   }
-  function timed(kind: 'transport' | 'shade', draw: () => void) {
+  function timed(kind: 'transport' | 'shade', draw: () => void, pixels = 0) {
     if (!timer || pending.length > 12) {
       draw();
       return;
@@ -105,7 +122,7 @@ export function createRenderer(canvas: HTMLCanvasElement) {
     gl.beginQuery(timer.TIME_ELAPSED_EXT, q);
     draw();
     gl.endQuery(timer.TIME_ELAPSED_EXT);
-    pending.push({ query: q, kind });
+    pending.push({ query: q, kind, pixels });
   }
   function poll() {
     if (!timer) return;
@@ -116,9 +133,15 @@ export function createRenderer(canvas: HTMLCanvasElement) {
         if (!disjoint) {
           const list =
             p.kind === 'transport' ? stats.gpuTransportMs : stats.gpuShadeMs;
-          list.push(
-            Number(gl.getQueryParameter(p.query, gl.QUERY_RESULT)) / 1e6,
-          );
+          const milliseconds =
+            Number(gl.getQueryParameter(p.query, gl.QUERY_RESULT)) / 1e6;
+          list.push(milliseconds);
+          if (p.kind === 'transport' && p.pixels > 0) {
+            const cost = milliseconds / p.pixels;
+            transportMsPerPixel = transportMsPerPixel
+              ? 0.75 * transportMsPerPixel + 0.25 * cost
+              : cost;
+          }
           if (list.length > 600) list.shift();
         }
         gl.deleteQuery(p.query);
@@ -157,7 +180,7 @@ export function createRenderer(canvas: HTMLCanvasElement) {
       ratio = rect.width / Math.max(1, rect.height),
       longest = Math.max(rect.width, rect.height),
       scale =
-        Math.min(1, (view.moving ? 640 : 1280) / Math.max(1, longest)) *
+        Math.min(1, (view.moving ? 960 : 1280) / Math.max(1, longest)) *
         view.quality;
     const w = Math.max(1, Math.round(rect.width * scale)),
       h = Math.max(1, Math.round(rect.height * scale));
@@ -177,42 +200,99 @@ export function createRenderer(canvas: HTMLCanvasElement) {
         : []),
     ].join('/');
     if (key !== lastKey) {
-      const lw = Math.max(1, Math.round(Math.min(w, view.moving ? 240 : 280))),
+      const preview =
+        transportMsPerPixel > 0
+          ? Math.max(
+              224,
+              Math.min(
+                384,
+                32 *
+                  Math.floor(
+                    Math.sqrt((16 / transportMsPerPixel) * ratio) / 32,
+                  ),
+              ),
+            )
+          : 320;
+      const lw = Math.max(
+          1,
+          Math.round(Math.min(w, view.moving ? preview : 280)),
+        ),
         lh = Math.max(1, Math.round(lw / ratio));
-      removeTarget(gl, low);
-      removeTarget(gl, high);
-      removeTarget(gl, hdr);
-      low = target(gl, lw, lh);
-      high = target(gl, w, h);
-      hdr = target(gl, w, h, true);
-      gl.clearColor(0, 0, 0, -1);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, high.fbo);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-      setTransport(view);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, low.fbo);
-      gl.viewport(0, 0, lw, lh);
-      gl.uniform2f(tu.resolution, lw, lh);
-      timed('transport', () => gl.drawArrays(gl.TRIANGLES, 0, 3));
-      stats.transportPasses++;
-      row = 0;
+      if (low && high && hdr) cache.set(lastKey, { low, high, hdr, row });
+      const existing = cache.get(key);
+      cache.delete(key);
+      if (existing) {
+        ({ low, high, hdr, row } = existing);
+        stats.cachedFrames++;
+      } else {
+        // Recycle an evicted allocation when dimensions agree; keep GPU memory bounded.
+        let recycled: Cached | undefined;
+        if (cacheBytes() >= cacheBudget && cache.size) {
+          const oldest = cache.keys().next().value!;
+          recycled = cache.get(oldest)!;
+          cache.delete(oldest);
+        }
+        if (
+          recycled &&
+          recycled.low.w === lw &&
+          recycled.low.h === lh &&
+          recycled.high.w === w &&
+          recycled.high.h === h
+        ) {
+          ({ low, high, hdr } = recycled);
+        } else {
+          if (recycled) free(recycled);
+          low = target(gl, lw, lh);
+          high = target(gl, w, h);
+          hdr = target(gl, w, h, true);
+        }
+        gl.clearColor(0, 0, 0, -1);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, high.fbo);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        setTransport(view);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, low.fbo);
+        gl.viewport(0, 0, lw, lh);
+        gl.uniform2f(tu.resolution, lw, lh);
+        timed('transport', () => gl.drawArrays(gl.TRIANGLES, 0, 3), lw * lh);
+        stats.transportPasses++;
+        row = 0;
+      }
+      while (cacheBytes() > cacheBudget && cache.size) {
+        const oldest = cache.keys().next().value!;
+        free(cache.get(oldest)!);
+        cache.delete(oldest);
+      }
       lastKey = key;
-      canvas.width = w;
-      canvas.height = h;
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
       stats.width = w;
       stats.height = h;
-      stats.floatBufferBytes = lw * lh * 16 + w * h * 24;
+      stats.floatBufferBytes = lw * lh * 16 + w * h * 24 + cacheBytes();
     } else if (high && row < high.h) {
       setTransport(view);
       gl.bindFramebuffer(gl.FRAMEBUFFER, high.fbo);
       gl.viewport(0, 0, high.w, high.h);
       gl.uniform2f(tu.resolution, high.w, high.h);
+      const pixels =
+        transportMsPerPixel > 0
+          ? Math.max(
+              1024,
+              Math.min(view.moving ? 16384 : 8192, 12 / transportMsPerPixel),
+            )
+          : view.moving
+            ? 16384
+            : 8192;
       const rows = Math.min(
-        Math.max(1, Math.floor(8192 / high.w)),
+        Math.max(1, Math.floor(pixels / high.w)),
         high.h - row,
       );
       gl.enable(gl.SCISSOR_TEST);
       gl.scissor(0, row, high.w, rows);
-      timed('transport', () => gl.drawArrays(gl.TRIANGLES, 0, 3));
+      timed(
+        'transport',
+        () => gl.drawArrays(gl.TRIANGLES, 0, 3),
+        high.w * rows,
+      );
       gl.disable(gl.SCISSOR_TEST);
       row += rows;
       stats.transportPasses++;
@@ -304,6 +384,8 @@ export function createRenderer(canvas: HTMLCanvasElement) {
       removeTarget(gl, low);
       removeTarget(gl, high);
       removeTarget(gl, hdr);
+      cache.forEach(free);
+      cache.clear();
       gl.deleteProgram(transport);
       gl.deleteProgram(shade);
       gl.deleteProgram(display);

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createVessels } from './vessels';
+import { createEncounterScene } from './encounter-scene';
+import type { Navigation } from './navigation';
 export type CinematicFrame = {
   shot: 'title' | 'black' | 'scale' | 'carrier' | 'probe' | 'cabin';
   progress: number;
@@ -30,6 +32,7 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
   fill.position.set(8, 8, 20);
   scene.add(fill);
   scene.add(new THREE.AmbientLight(0xb9b4a1, 0.45));
+  const encounter = createEncounterScene(scene);
   const vessels = createVessels();
   scene.add(vessels.carrier);
   const capsule = new THREE.Group(),
@@ -90,7 +93,15 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
   let width = 0,
     height = 0;
   return {
-    render(mode: Perspective, separationM = 0, cinematic?: CinematicFrame) {
+    remember: (sky: HTMLCanvasElement, properSeconds: number) =>
+      encounter.remember(sky, canvas, properSeconds),
+    clearMemories: encounter.clearMemories,
+    render(
+      mode: Perspective,
+      separationM = 0,
+      cinematic?: CinematicFrame,
+      navigation?: Navigation,
+    ) {
       if (assetError)
         throw new Error(
           'Spacecraft asset could not be loaded. Reload to retry.',
@@ -108,13 +119,20 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
         height = h;
       }
       renderer.clear();
-      if (mode !== 'beside' && mode !== 'wide') return;
+      if (
+        navigation?.kind === 'memory' ||
+        (mode !== 'beside' && mode !== 'wide')
+      ) {
+        if (navigation)
+          encounter.draw(renderer, navigation, camera.aspect, true);
+        return;
+      }
       const wide = mode === 'wide';
-      camera.position.set(0, wide ? 0 : 10, wide ? 180 : 30);
+      camera.position.set(0, wide ? 0 : 10, wide ? 180 : 95);
       camera.lookAt(0, 0, 0);
       capsule.visible = !wide && loaded;
-      capsule.position.set(-1, -1, 0);
-      capsule.rotation.set(0.2, -0.4, -0.35);
+      capsule.position.set(0, 0, 0);
+      capsule.rotation.set(0.2, -0.4, -0.35 + (navigation?.flash ?? 0) * 0.12);
       vessels.carrier.visible = wide || separationM < 1000;
       // Carrier is a local staging asset, not a second relativistic observer or escape worldline.
       vessels.carrier.position.set(
@@ -145,11 +163,14 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
         }
       }
       renderer.render(scene, camera);
+      if (navigation)
+        encounter.draw(renderer, navigation, camera.aspect, false);
     },
     dispose() {
       disposed = true;
       disposeAsset();
       vessels.dispose();
+      encounter.dispose();
       renderer.dispose();
     },
   };

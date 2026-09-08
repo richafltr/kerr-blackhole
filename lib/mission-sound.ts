@@ -55,12 +55,12 @@ export class MissionSound {
       const approach = (a: HTMLAudioElement, target: number) => {
         a.volume += (target - a.volume) * (1 - Math.exp(-dt / 1.2));
       };
-      const falling = this.phase === 'fall';
+      const falling = this.phase === 'fall' || this.phase === 'memory';
       const gain = this.musicEnabled ? 1 : 0;
       approach(
         this.bed,
         gain *
-          (falling || this.phase === 'end'
+          (falling || ['threshold', 'home', 'lost'].includes(this.phase)
             ? 0
             : this.duck
               ? 0.2
@@ -70,7 +70,12 @@ export class MissionSound {
       );
       approach(
         this.descent,
-        gain * (falling ? 0.68 : this.phase === 'end' ? 0.12 : 0),
+        gain *
+          (falling
+            ? 0.68
+            : ['threshold', 'home', 'lost'].includes(this.phase)
+              ? 0.12
+              : 0),
       );
       this.voice.muted = !this.voiceEnabled;
       this.bed.muted = !this.musicEnabled;
