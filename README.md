@@ -1,12 +1,16 @@
-# Kerr Black Hole / Vesper
+# interstellar: ad astra / Kerr Black Hole
 
 **Public simulation:** https://kerr-blackhole.vercel.app
 
 An interactive exterior encounter with a rotating black hole. From a first-person cabin, choose release and follow a timelike Kerr trajectory while the GPU computes light paths from the moving observer. Switch between cabin, nearby chase camera, and unobstructed optics using the bottom-right controls.
 
-The current build uses **WebGL2**, with direct GLSL for general-relativistic light transport and Three.js for the textured spacecraft. A generated cabin foreground surrounds the live simulation. Motion uses a lower-resolution preview and 2400× time-lapse playback after the initial release. The journey stops outside the horizon; it does not simulate a singularity or quantum gravity.
+The current build uses **WebGL2**, with direct GLSL for general-relativistic light transport and Three.js for original faceted spacecraft and a segmented ring carrier. A generated cabin foreground surrounds the live simulation. Motion uses a lower-resolution preview and 2400× time-lapse playback after the initial release. The journey stops outside the horizon; it does not simulate a singularity or quantum gravity.
 
-[Current checkpoint, physical scope, and limitations](docs/VESPER_CHECKPOINT.md) · [Assets and attribution](docs/ASSETS.md) · [Original GPU validation](docs/VALIDATION.md)
+[Descent research and current game scope](docs/DESCENT_RESEARCH.md) · [Preserved checkpoint, physical scope, and limitations](docs/VESPER_CHECKPOINT.md) · [Assets and attribution](docs/ASSETS.md) · [Original GPU validation](docs/VALIDATION.md)
+
+## Current extension
+
+A cinematic entrance, three voiced mission transmissions, a deliberate crew-seat/release decision, and warm Cinema/Spectral color selection. A new float64 Kerr curvature calculation projects the tidal tensor into the traveler’s frame and displays the stretching differential acceleration across 2 m. Thirty CPU tests now pass, including Schwarzschild tidal eigenvalues, Kerr vacuum/symmetry checks and finite-difference convergence. The crew story is fictional; remote signal transport, hull breakup and interior flight are pending the gates in [descent research](docs/DESCENT_RESEARCH.md).
 
 ## Preserved cabin and free-fall checkpoint
 
@@ -59,7 +63,7 @@ Open the local URL printed by the server. WebGL2, floating-point render targets,
 | Public build | Static Vite/React, npm lockfile | Vercel CDN; no request-time server or GPU bill. |
 | Alternate build | Vinext / Sites | Retained existing preview target. |
 
-This stack minimizes implementation overhead for the current sprint. It is not a measured claim that WebGL2 outperforms WebGPU. Three.js now loads and renders the detailed spacecraft asset; it does not solve relativity. The Kerr pass stays independent.
+This stack minimizes implementation overhead for the current sprint. It is not a measured claim that WebGL2 outperforms WebGPU. Three.js renders the procedural spacecraft meshes; it does not solve relativity. The Kerr pass stays independent.
 
 WebGPU offers compute pipelines and storage buffers, but does not by itself increase physical fidelity. WGSL supports runtime f32 and optional f16, not runtime f64. WebGL2 also does not provide portable double-precision shaders. Native Metal targets this Apple M4, while CUDA does not; neither is needed for this browser prototype. Keep one GPU backend until profiling establishes a reason to migrate.
 
@@ -84,7 +88,7 @@ Stationary rays have at most 900 RK4 steps; moving-observer rays use half-sized 
 
 ## Verification
 
-Run `npm test`, `npm run typecheck`, `npx oxlint app lib tests client vite.vercel.config.ts`, and `npm run build:vercel`. Twenty-six CPU tests cover the reference equations, tetrad, ISCO, conservation, convergence, physical units, static clocks, and probe angular size. Open `/?validate=1` to run actual GPU/reference comparisons and cache checks; it is a diagnostic page, absent from the normal interface.
+Run `npm test`, `npm run typecheck`, `npx oxlint app lib tests client vite.vercel.config.ts`, and `npm run build:vercel`. Thirty CPU tests cover the reference equations, tetrad, ISCO, conservation, convergence, physical units, static clocks, and probe angular size. Open `/?validate=1` to run actual GPU/reference comparisons and cache checks; it is a diagnostic page, absent from the normal interface.
 
 On the recorded browser run, all 140 sampled Kerr rays agreed in classification, with maximum disk-hit discrepancy `1.473e-5 M`. See [validation results and limitations](docs/VALIDATION.md), rather than interpreting these selected-ray checks as a global accuracy guarantee.
 

@@ -13,3 +13,7 @@ Prompt used:
 `public/assets/apollo-soyuz.glb` — **NASA/Michael D. Carbajal**. Model source: [NASA Apollo–Soyuz](https://science.nasa.gov/3d-resources/apollo-soyuz/), [NASA GitHub mirror](https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/Apollo%20Soyuz). Download is 952,608 bytes, with embedded textures. The renderer separates its Apollo and Soyuz material groups, retains model dimensions, and stages them as fictional probe/carrier imagery. This is not a NASA mission or an endorsement.
 
 NASA's [media usage guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/) permit educational/informational use of model and texture data with source acknowledgement; NASA identifiers do not imply endorsement. These third-party media terms remain separate from the project's code licensing. No film footage, soundtrack, actor likeness, or exact Interstellar spacecraft model is included.
+
+## Ad Astra spacecraft revision
+
+The current game uses original procedural geometry in `lib/vessels.ts`: a twelve-module ring carrier and a faceted probe with panel lines, dark glazing, metal bands and engine bells. Its design uses the supplied film references for broad shape/palette only. No film models, textures, dialogue, score or footage are bundled. The NASA Apollo–Soyuz asset remains preserved in the repository and `baseline-vesper-v1`, but is no longer loaded by the current renderer.

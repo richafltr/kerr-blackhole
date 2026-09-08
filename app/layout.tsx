@@ -13,7 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Black Hole', description: 'A GPU-rendered black hole with a gravitationally lensed accretion disk.',
+  title: 'Interstellar: Ad Astra',
+  description:
+    'A cinematic probe descent powered by Kerr geodesics and local tidal physics.',
 };
 
 export default function RootLayout({

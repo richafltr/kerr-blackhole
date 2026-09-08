@@ -10,6 +10,9 @@ import {
   flightCamera,
   type Flight,
 } from '@/lib/flight';
+import { MissionIntro } from './mission-intro';
+import { makeCamera } from '@/lib/camera';
+import { tidalStretch } from '@/lib/tides';
 import { Slider } from '@/components/ui/slider';
 import { createRenderer, defaultView, type View } from '@/lib/renderer';
 import {
@@ -26,7 +29,9 @@ export default function Page() {
     probeCanvas = useRef<HTMLCanvasElement>(null);
   const [perspective, setPerspective] = useState<Perspective>('onboard'),
     [view, setView] = useState<View>(defaultView);
-  const [playing, setPlaying] = useState(true),
+  const [intro, setIntro] = useState(true),
+    [cinematic, setCinematic] = useState(true);
+  const [playing, setPlaying] = useState(false),
     [controls, setControls] = useState(false),
     [error, setError] = useState('');
   const [phase, setPhase] = useState<'hold' | 'armed' | 'fall' | 'end'>('hold');
@@ -35,18 +40,19 @@ export default function Page() {
     reference: 0,
     radius: 30,
     warp: 1,
+    tide: 0,
   });
   const settings = useRef(view),
-    mode = useRef(perspective),
-    paused = useRef(false),
+    mode = useRef<Perspective>('wide'),
+    paused = useRef(true),
     flight = useRef<Flight | null>(null),
     reset = useRef(0);
   useEffect(() => {
     settings.current = view;
   }, [view]);
   useEffect(() => {
-    mode.current = perspective;
-  }, [perspective]);
+    mode.current = intro ? 'wide' : perspective;
+  }, [perspective, intro]);
   useEffect(() => {
     paused.current = !playing;
   }, [playing]);
@@ -140,6 +146,12 @@ export default function Page() {
             reference: time,
             radius: flight.current?.radius ?? v.distance,
             warp,
+            tide: tidalStretch(
+              flight.current
+                ? flightCamera(flight.current)
+                : makeCamera(v.distance, v.inclination, v.spin),
+              v.spin,
+            ),
           });
           lastTelemetry = now;
         }
@@ -174,7 +186,9 @@ export default function Page() {
       [key]: typeof value === 'number' ? value : value[0],
     }));
   return (
-    <main className={`perspective-${perspective} flight-${phase}`}>
+    <main
+      className={`perspective-${intro ? 'wide' : perspective} flight-${phase} ${cinematic ? 'cinematic' : 'spectral'}`}
+    >
       <div className="universe">
         <canvas ref={canvas} aria-label="Live Kerr spacetime rendering" />
       </div>
@@ -183,182 +197,204 @@ export default function Page() {
         className="probe-layer"
         aria-label="Exterior probe camera"
       />
-      {perspective === 'onboard' && (
+      {!intro && perspective === 'onboard' && (
         <img
           className="cabin-art"
           src="/assets/cabin-v2.png"
           alt="Pilot's view through the spacecraft window"
         />
       )}
-      <header className="flight-heading">
-        <span>
-          VESPER <b>/</b> 01
-        </span>
-        <span>
-          {phase === 'fall'
-            ? 'FREE FALL'
-            : phase === 'end'
-              ? 'END OF TRACK'
-              : 'HOLDING'}
-        </span>
-      </header>
-      <div className="flight-readout">
-        <span>
-          τ <b>{clockDisplay(telemetry.local)}</b>
-        </span>
-        <span>
-          r <b>{telemetry.radius.toFixed(2)} M</b>
-        </span>
-        {phase === 'fall' && telemetry.warp > 1 && (
-          <span className="timewarp">TIME LAPSE ×2400</span>
-        )}
-      </div>
-      {perspective === 'onboard' && (
-        <div className="console-choice">
-          {phase === 'hold' || phase === 'armed' ? (
-            <>
-              <span className="choice-eyebrow">
-                {phase === 'armed' ? 'COMMIT TO DESCENT' : 'AT THE EDGE'}
-              </span>
-              <button
-                className="release"
-                onClick={() =>
-                  phase === 'hold' ? setPhase('armed') : release()
-                }
-              >
-                {phase === 'armed' ? 'RELEASE' : 'LET GO'}
-              </button>
-              {phase === 'armed' && (
-                <button className="remain" onClick={() => setPhase('hold')}>
-                  HOLD POSITION
-                </button>
-              )}
-            </>
-          ) : phase === 'end' ? (
-            <>
-              <span className="choice-eyebrow">EXTERIOR LIMIT</span>
-              <button className="release" onClick={restart}>
-                BEGIN AGAIN
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="choice-eyebrow">PROPER TIME</span>
-              <strong className="flight-clock">
-                {clockDisplay(telemetry.local)}
-              </strong>
-            </>
+      <div className="flight-interface" hidden={intro}>
+        <header className="flight-heading">
+          <span>
+            VESPER <b>/</b> 01
+          </span>
+          <span>
+            {phase === 'fall'
+              ? 'FREE FALL'
+              : phase === 'end'
+                ? 'EXTERIOR LIMIT'
+                : 'AWAITING COMMAND'}
+          </span>
+        </header>
+        <div className="flight-readout">
+          <span>
+            τ <b>{clockDisplay(telemetry.local)}</b>
+          </span>
+          <span>
+            r <b>{telemetry.radius.toFixed(2)} M</b>
+          </span>
+          <span>
+            Δa₂ₘ <b>{(telemetry.tide * 1e6).toFixed(3)} µm/s²</b>
+          </span>
+          {phase === 'fall' && telemetry.warp > 1 && (
+            <span className="timewarp">TIME LAPSE ×2400</span>
           )}
         </div>
-      )}
-      {perspective !== 'onboard' && phase === 'end' && (
-        <button className="exterior-restart" onClick={restart}>
-          BEGIN AGAIN
-        </button>
-      )}
-      <nav className="view-dock" aria-label="Camera views">
-        {(
-          [
-            { mode: 'onboard', label: '01 / CABIN', Icon: ScanLine },
-            { mode: 'beside', label: '02 / CHASE', Icon: Camera },
-            { mode: 'optics', label: '03 / OPTICS', Icon: Orbit },
-          ] as const
-        ).map(({ mode: target, label, Icon }) => (
-          <button
-            key={target}
-            aria-label={label}
-            aria-pressed={perspective === target}
-            onClick={() => setPerspective(target)}
-          >
-            <Icon size={22} strokeWidth={1} />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="flight-tools">
-        <button
-          aria-label={playing ? 'Pause' : 'Play'}
-          title={playing ? 'Pause' : 'Play'}
-          onClick={() => setPlaying(!playing)}
-        >
-          {playing ? <Pause size={15} /> : <Play size={15} />}
-        </button>
-        <button
-          aria-label="Camera controls"
-          title="Camera controls"
-          aria-expanded={controls}
-          onClick={() => setControls(!controls)}
-        >
-          <SlidersHorizontal size={15} />
-        </button>
-        <button
-          aria-label="Restart observation"
-          title="Restart observation"
-          onClick={restart}
-        >
-          <RotateCcw size={15} />
-        </button>
-      </div>
-      {controls && (
-        <section className="controls" aria-label="Camera controls">
-          <div className="reference-note">
-            REFERENCE CLOCK {clockDisplay(telemetry.reference)}
+        {!intro && perspective === 'onboard' && (
+          <div className="console-choice">
+            {phase === 'hold' || phase === 'armed' ? (
+              <>
+                <span className="choice-eyebrow">
+                  {phase === 'armed' ? 'RETURN SEAT → MARA' : 'ONE SEAT HOME'}
+                </span>
+                <button
+                  className="release"
+                  onClick={() =>
+                    phase === 'hold' ? setPhase('armed') : release()
+                  }
+                >
+                  {phase === 'armed' ? 'RELEASE VESPER' : 'TAKE THE DESCENT'}
+                </button>
+                {phase === 'armed' && (
+                  <button className="remain" onClick={() => setPhase('hold')}>
+                    ABORT RELEASE
+                  </button>
+                )}
+              </>
+            ) : phase === 'end' ? (
+              <>
+                <span className="choice-eyebrow">EXTERIOR LIMIT</span>
+                <button className="release" onClick={restart}>
+                  BEGIN AGAIN
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="choice-eyebrow">SEAT ASSIGNED / MARA</span>
+                <strong className="flight-clock">
+                  {clockDisplay(telemetry.local)}
+                </strong>
+              </>
+            )}
           </div>
+        )}
+        {perspective !== 'onboard' && phase === 'end' && (
+          <button className="exterior-restart" onClick={restart}>
+            BEGIN AGAIN
+          </button>
+        )}
+        <nav className="view-dock" aria-label="Camera views">
           {(
             [
-              { key: 'spin', label: 'Spin', min: -0.9, max: 0.9, step: 0.05 },
-              {
-                key: 'inclination',
-                label: 'Inclination',
-                min: 30,
-                max: 88,
-                step: 1,
-              },
-              { key: 'roll', label: 'Roll', min: -90, max: 90, step: 1 },
-              {
-                key: 'distance',
-                label: 'Release radius',
-                min: 24,
-                max: 55,
-                step: 1,
-              },
-              {
-                key: 'exposure',
-                label: 'Exposure',
-                min: 0.3,
-                max: 3,
-                step: 0.1,
-              },
-              {
-                key: 'quality',
-                label: 'Resolution',
-                min: 0.4,
-                max: 1,
-                step: 0.1,
-              },
+              { mode: 'onboard', label: '01 / CABIN', Icon: ScanLine },
+              { mode: 'beside', label: '02 / CHASE', Icon: Camera },
+              { mode: 'optics', label: '03 / OPTICS', Icon: Orbit },
             ] as const
-          ).map((c) => (
-            <div key={c.key}>
-              <div id={c.key} className="label">
-                {c.label}
-                <span>
-                  {view[c.key].toFixed(c.step < 0.1 ? 2 : c.step < 1 ? 1 : 0)}
-                </span>
-              </div>
-              <Slider
-                aria-labelledby={c.key}
-                min={c.min}
-                max={c.max}
-                step={c.step}
-                disabled={
-                  (phase === 'fall' || phase === 'end') && c.key !== 'exposure'
-                }
-                value={[view[c.key]]}
-                onValueChange={(v) => update(c.key, v)}
-              />
-            </div>
+          ).map(({ mode: target, label, Icon }) => (
+            <button
+              key={target}
+              aria-label={label}
+              aria-pressed={perspective === target}
+              onClick={() => setPerspective(target)}
+            >
+              <Icon size={22} strokeWidth={1} />
+              <span>{label}</span>
+            </button>
           ))}
-        </section>
+        </nav>
+        <div className="flight-tools">
+          <button
+            aria-label={playing ? 'Pause' : 'Play'}
+            title={playing ? 'Pause' : 'Play'}
+            onClick={() => setPlaying(!playing)}
+          >
+            {playing ? <Pause size={15} /> : <Play size={15} />}
+          </button>
+          <button
+            aria-label="Camera controls"
+            title="Camera controls"
+            aria-expanded={controls}
+            onClick={() => setControls(!controls)}
+          >
+            <SlidersHorizontal size={15} />
+          </button>
+          <button
+            aria-label="Restart observation"
+            title="Restart observation"
+            onClick={restart}
+          >
+            <RotateCcw size={15} />
+          </button>
+        </div>
+        {controls && (
+          <section className="controls" aria-label="Camera controls">
+            <button
+              className="grade-toggle"
+              aria-pressed={cinematic}
+              onClick={() => setCinematic(!cinematic)}
+            >
+              COLOR / {cinematic ? 'CINEMA' : 'SPECTRAL'}
+            </button>
+            <div className="reference-note">
+              REFERENCE CLOCK {clockDisplay(telemetry.reference)}
+            </div>
+            {(
+              [
+                { key: 'spin', label: 'Spin', min: -0.9, max: 0.9, step: 0.05 },
+                {
+                  key: 'inclination',
+                  label: 'Inclination',
+                  min: 30,
+                  max: 88,
+                  step: 1,
+                },
+                { key: 'roll', label: 'Roll', min: -90, max: 90, step: 1 },
+                {
+                  key: 'distance',
+                  label: 'Release radius',
+                  min: 24,
+                  max: 55,
+                  step: 1,
+                },
+                {
+                  key: 'exposure',
+                  label: 'Exposure',
+                  min: 0.3,
+                  max: 3,
+                  step: 0.1,
+                },
+                {
+                  key: 'quality',
+                  label: 'Resolution',
+                  min: 0.4,
+                  max: 1,
+                  step: 0.1,
+                },
+              ] as const
+            ).map((c) => (
+              <div key={c.key}>
+                <div id={c.key} className="label">
+                  {c.label}
+                  <span>
+                    {view[c.key].toFixed(c.step < 0.1 ? 2 : c.step < 1 ? 1 : 0)}
+                  </span>
+                </div>
+                <Slider
+                  aria-labelledby={c.key}
+                  min={c.min}
+                  max={c.max}
+                  step={c.step}
+                  disabled={
+                    (phase === 'fall' || phase === 'end') &&
+                    c.key !== 'exposure'
+                  }
+                  value={[view[c.key]]}
+                  onValueChange={(v) => update(c.key, v)}
+                />
+              </div>
+            ))}
+          </section>
+        )}
+      </div>
+      {intro && (
+        <MissionIntro
+          onEnter={() => {
+            setIntro(false);
+            setPlaying(true);
+            reset.current++;
+          }}
+        />
       )}
       {error && (
         <div role="alert" className="error">
