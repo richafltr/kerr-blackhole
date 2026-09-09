@@ -1,5 +1,17 @@
 # interstellar: ad astra / Kerr Black Hole
 
+## Playable versions
+
+| Version | Live game | What it preserves or adds |
+| --- | --- | --- |
+| Original submission | [Play the submitted game](https://kerr-blackhole.vercel.app/) | The preserved narrated cinematic game and original exterior Kerr checkpoint. |
+| More physical descent | [Play the improved version](https://kerr-blackhole-physical.vercel.app/) | A parallel-transported Kerr observer frame, a live 3D cockpit, sky-driven lighting, shared cabin/chase orientation, fuel-limited roll control, and contact-direction collision response. |
+
+The improved version is maintained separately on [`feature/physical-descent`](https://github.com/richafltr/kerr-blackhole/tree/feature/physical-descent). The original game remains available at its existing URL. Both retain the approved ElevenLabs narration and Scott Buckley score.
+
+The new physical-descent checkpoint passes **49 CPU tests**, TypeScript, authored-code lint, GLSL compilation/link checks, and the Vercel build. It still models the **exterior**: the scientific renderer stops outside the horizon, and the memory-space finale remains speculative. It uses **WebGL2/GLSL**, not a WebGPU backend, and makes no new measured FPS or film-fidelity claim. [Physics improvements, controls, assumptions and remaining milestones](https://github.com/richafltr/kerr-blackhole/blob/feature/physical-descent/docs/PHYSICAL_DESCENT.md).
+
+
 **Public simulation:** https://kerr-blackhole.vercel.app
 
 A first-person probe descent built around real Kerr light transport and timelike motion, with a playable local debris encounter and an explicitly speculative memory-space finale. The opening shows **Interstellar: Ad Astra**, **Play**, and **Skip Intro**. The original narrator and score accompany an animated preview of calculated falling-observer views.
