@@ -1,6 +1,6 @@
 # Physical descent — separate development checkpoint
 
-The submitted game is preserved locally by `baseline-submission-v1` at `f79b53a`. This work lives on **feature/physical-descent** in the separate `kerr-blackhole-physical` worktree. It has not been pushed or deployed, and does not alter the production Vercel project. The original worktree's uncommitted submission documentation is also left in place.
+The submitted game is preserved locally by `baseline-submission-v1` at `f79b53a`. This work lives on **feature/physical-descent** in the separate `kerr-blackhole-physical` worktree. It is published separately at **https://kerr-blackhole-physical.vercel.app/**. The original Vercel game remains at **https://kerr-blackhole.vercel.app/**. The original worktree's uncommitted submission documentation is also left in place.
 
 The visual target is the scale, material presence, restraint, and human viewpoint of Interstellar. The film is an art-direction reference; its interior spectacle is not treated as an independently validated physics solution.
 
@@ -14,6 +14,14 @@ The visual target is the scale, material presence, restraint, and human viewpoin
 - **Mechanical reaction.** A suspended head responds to local proper acceleration; an initially moving washer drifts within a slack tether. The tether engages beyond 0.15 m displacement per local axis. The cabin response currently includes translation and impact response, but not full rotational fictitious-force terms. These are bounded, authored mechanical approximations, not a human biomechanics model. Free fall alone does not inject shake. Objects do not oscillate merely because the hole approaches.
 - **Visible impacts.** Encounter panels share the craft camera instead of a separate overlay camera. A nominal 12 kg panel and the existing encounter closing speed determine an inelastic reduced-mass impulse and a contact-direction impulse and its roll moment. The impulse uses the same panel orientation as the visible mesh; it changes local translation and suspended-head velocity consistently. Seventy-two pooled secondary fragments are released on actual collisions; geometry and materials are reused. The existing three-hit survival rule remains authored gameplay. There is no material fracture solver or tidal hull tearing.
 - **Emission structure.** A periodic, multi-scale emission texture is differentially advected at the existing orbital angular frequency. The mass-dependent time conversion remains intact. This improves material variation within the existing thin opaque disk; it does not simulate a turbulent fluid or account for per-ray retarded emission times.
+
+## Published checkpoint
+
+- Game source: `d2385bb`, tagged `physical-descent-v1`.
+- Vercel project: `kerr-blackhole-physical`, separate from the original `kerr-blackhole` project.
+- Live improved version: https://kerr-blackhole-physical.vercel.app/
+- Original submission: https://kerr-blackhole.vercel.app/
+- Hosted build completed successfully on 8 September 2026; the public page and capsule asset returned HTTP 200. The original page's content hash was unchanged after publishing.
 
 ## Controls and preview
 
@@ -42,4 +50,4 @@ The simulation still stops at `r+ + 0.3 M`, outside the outer horizon. The memor
 3. Replace authored survival counters with a documented structural-response model, and connect the carrier's outcome to its own trajectory.
 4. Validate a Schwarzschild horizon-crossing control case before extending Kerr camera and light-source handling to the interior.
 
-Keep the production tag and deployment intact throughout these gates. Deploying this work, if requested later, must use a separate preview/project until an explicit production replacement is requested.
+Keep the production tag and deployment intact throughout these gates. Future updates to this branch must deploy to the separate `kerr-blackhole-physical` project. Do not replace the original deployment unless explicitly requested.

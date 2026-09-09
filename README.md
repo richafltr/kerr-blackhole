@@ -1,11 +1,17 @@
 # interstellar: ad astra / Kerr Black Hole
 
-> **Separate physical-descent development version.** Branch `feature/physical-descent` starts from `f79b53a`, preserved as `baseline-submission-v1`. Production is unchanged. [New implementation, controls, physical assumptions and review gates](docs/PHYSICAL_DESCENT.md).
->
-> This milestone adds a parallel-transported Kerr observer frame, shared optical/craft orientation, asynchronous full-sphere sky lighting, a live 3D cabin, propellant-limited roll control and local mechanical impact response. The approved narration and score remain unchanged. It is an exterior development checkpoint, not a claim of film-quality rendering or a validated black-hole interior.
+## Playable versions
 
-The following sections describe the submission baseline; the development changes and current checks are documented above.
+| Version | Live game | What it preserves or adds |
+| --- | --- | --- |
+| Original submission | [Play the submitted game](https://kerr-blackhole.vercel.app/) | The preserved narrated cinematic game and original exterior Kerr checkpoint. |
+| More physical descent | [Play the improved version](https://kerr-blackhole-physical.vercel.app/) | A parallel-transported Kerr observer frame, a live 3D cockpit, sky-driven lighting, shared cabin/chase orientation, fuel-limited roll control, and contact-direction collision response. |
 
+The improved version is maintained separately on [`feature/physical-descent`](https://github.com/richafltr/kerr-blackhole/tree/feature/physical-descent). The original game remains available at its existing URL. Both retain the approved ElevenLabs narration and Scott Buckley score.
+
+The new physical-descent checkpoint passes **49 CPU tests**, TypeScript, authored-code lint, GLSL compilation/link checks, and the Vercel build. It still models the **exterior**: the scientific renderer stops outside the horizon, and the memory-space finale remains speculative. It uses **WebGL2/GLSL**, not a WebGPU backend, and makes no new measured FPS or film-fidelity claim. [Physics improvements, controls, assumptions and remaining milestones](https://github.com/richafltr/kerr-blackhole/blob/feature/physical-descent/docs/PHYSICAL_DESCENT.md).
+
+The following sections retain the submission baseline documentation. The separate physical-descent implementation is described in the linked technical notes above.
 
 **Public simulation:** https://kerr-blackhole.vercel.app
 
