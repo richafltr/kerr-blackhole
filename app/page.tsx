@@ -15,7 +15,7 @@ import {
   type PrologueFrame,
   type PrologueShot,
 } from './mission-intro';
-import { makeCamera } from '@/lib/camera';
+import { makeCamera, rotateCamera, relativeRotation } from '@/lib/camera';
 import { tidalStretch, tidalTensor } from '@/lib/tides';
 import { loadFlightPath, sampleFlightPath } from '@/lib/flight-path';
 import {
@@ -39,7 +39,7 @@ export default function Page() {
   const canvas = useRef<HTMLCanvasElement>(null),
     probeCanvas = useRef<HTMLCanvasElement>(null);
   const [perspective, setPerspective] = useState<Perspective>('onboard'),
-    [view, setView] = useState<View>(defaultView);
+    [view, setView] = useState<View>({ ...defaultView, roll: 0 });
   const introFrame = useRef<PrologueFrame | undefined>({
     shot: 'title',
     progress: 0,
@@ -65,6 +65,8 @@ export default function Page() {
   const [phase, setPhase] = useState<Phase>('hold');
   const phaseRef = useRef<Phase>('hold');
   const navigation = useRef<Navigation | undefined>(undefined);
+  const look = useRef([0, 0]);
+  const dragging = useRef<{ x: number; y: number } | null>(null);
   const inputs = useRef<Input>({ x: 0, y: 0, brake: false });
   const trajectory = useRef<Flight[]>([]);
   const localTide = useRef([
@@ -110,15 +112,19 @@ export default function Page() {
           Number(keys.has('w') || keys.has('arrowup')) -
           Number(keys.has('s') || keys.has('arrowdown')),
         brake: keys.has(' '),
+        roll: Number(keys.has('q')) - Number(keys.has('e')),
       };
     };
     const down = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (
         [
           'w',
           'a',
           's',
           'd',
+          'q',
+          'e',
           'arrowup',
           'arrowdown',
           'arrowleft',
@@ -204,6 +210,7 @@ export default function Page() {
       archiveIndex = 0,
       key = '';
     let movingView: View | undefined;
+    let skyAttitude = [1, 0, 0, 0, 1, 0, 0, 0, 1];
     let releasePosition: number[] | undefined;
     const tg = physicalScale().time;
     const tick = (now: number) => {
@@ -303,19 +310,54 @@ export default function Page() {
           const staged = sampleFlightPath(trajectory.current, introProper);
           active = { ...v, camera: flightCamera(staged), moving: true };
         }
-        if (!['threshold', 'memory', 'home', 'lost'].includes(phaseRef.current))
-          renderer!.render(
-            (introFrame.current ? introProper : time / tg) / 6,
-            active,
-          );
         const separation =
           flight.current && releasePosition
             ? Math.hypot(
                 ...releasePosition.map((x, i) => x - flight.current!.state[i]),
               ) * physicalScale().length
             : 0;
+        const physicalFrame = {
+          dt,
+          elapsed: flightWall,
+          clock: local,
+          separation,
+          radius: flight.current?.radius ?? v.distance,
+          navigation: navigation.current,
+          light: renderer!.illumination,
+          reset: reset.current,
+          look: look.current,
+        };
+        if (!introFrame.current) {
+          const orientation = probe!.prepare(mode.current, physicalFrame);
+          let residual = relativeRotation(skyAttitude, orientation);
+          const angle = Math.acos(
+            Math.max(
+              -1,
+              Math.min(1, (residual[0] + residual[4] + residual[8] - 1) / 2),
+            ),
+          );
+          // Only rotation is reprojected. Rebase before leaving the overscanned optical view.
+          if (angle > 0.04) {
+            skyAttitude = orientation;
+            residual = relativeRotation(skyAttitude, orientation);
+          }
+          const carried =
+            active.camera ?? makeCamera(v.distance, v.inclination, v.spin);
+          active = {
+            ...active,
+            roll: 0,
+            camera: rotateCamera(carried, skyAttitude),
+            lightingCamera: carried,
+            orientation: residual,
+          };
+        }
+        if (!['threshold', 'memory', 'home', 'lost'].includes(phaseRef.current))
+          renderer!.render(
+            (introFrame.current ? introProper : time / tg) / 6,
+            active,
+          );
         probe!.render(
-          mode.current === 'onboard' ? 'optics' : mode.current,
+          mode.current,
           separation,
           introFrame.current,
           navigation.current &&
@@ -323,6 +365,7 @@ export default function Page() {
               navigation.current.kind === 'memory')
             ? navigation.current
             : undefined,
+          introFrame.current ? undefined : physicalFrame,
         );
         if (
           phaseRef.current === 'fall' &&
@@ -383,6 +426,7 @@ export default function Page() {
   }, []);
   const restart = () => {
     flight.current = null;
+    look.current = [0, 0];
     reset.current++;
     navigation.current = undefined;
     inputs.current = { x: 0, y: 0, brake: false };
@@ -405,7 +449,35 @@ export default function Page() {
     }));
   return (
     <main
-      className={`perspective-${intro ? (introShot === 'cabin' ? 'onboard' : 'wide') : perspective} flight-${phase} ${cinematic ? 'cinematic' : 'spectral'} ${intro ? `in-prologue prologue-${introShot}` : ''}`}
+      onPointerDown={(e) => {
+        if (
+          intro ||
+          perspective !== 'onboard' ||
+          (e.target as HTMLElement).closest('button,input,nav,section')
+        )
+          return;
+        dragging.current = { x: e.clientX, y: e.clientY };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        const last = dragging.current;
+        if (!last) return;
+        look.current = [
+          Math.max(
+            -0.4,
+            Math.min(0.4, look.current[0] - (e.clientX - last.x) * 0.0018),
+          ),
+          Math.max(
+            -0.23,
+            Math.min(0.23, look.current[1] - (e.clientY - last.y) * 0.0018),
+          ),
+        ];
+        dragging.current = { x: e.clientX, y: e.clientY };
+      }}
+      onPointerUp={() => (dragging.current = null)}
+      onPointerCancel={() => (dragging.current = null)}
+      onLostPointerCapture={() => (dragging.current = null)}
+      className={`physical-cut perspective-${intro ? (introShot === 'cabin' ? 'onboard' : 'wide') : perspective} flight-${phase} ${cinematic ? 'cinematic' : 'spectral'} ${intro ? `in-prologue prologue-${introShot}` : ''}`}
     >
       <div className="universe">
         <canvas ref={canvas} aria-label="Live Kerr spacetime rendering" />
@@ -415,10 +487,7 @@ export default function Page() {
         className="probe-layer"
         aria-label="Exterior probe camera"
       />
-      {((intro && introShot === 'cabin') ||
-        (!intro &&
-          perspective === 'onboard' &&
-          !['memory', 'home', 'lost'].includes(phase))) && (
+      {intro && introShot === 'cabin' && (
         <img
           className="cabin-art"
           src="/assets/cabin-v2.png"

@@ -47,7 +47,7 @@ export function observerCamera(
   const basis: FourVector[] = [];
   for (const direction of [
     position.map((x) => -x),
-    [position[1], -position[0], 0],
+    [-position[1], position[0], 0],
     [0, 0, 1],
   ]) {
     let v = [0, ...direction] as FourVector;
@@ -91,4 +91,28 @@ export function isco(a: number) {
   const z1 = 1 + Math.cbrt(1 - a * a) * (Math.cbrt(1 + a) + Math.cbrt(1 - a)),
     z2 = Math.sqrt(3 * a * a + z1 * z1);
   return 3 + z2 - Math.sign(a) * Math.sqrt((3 - z1) * (3 + z1 + 2 * z2));
+}
+
+/** Rotate the spatial legs using a column-major local camera rotation; preserve u. */
+export function rotateCamera(camera: Camera, matrix: number[]): Camera {
+  const combine = (x: number, y: number, z: number) =>
+    camera.right.map(
+      (v, i) => x * v + y * camera.up[i] - z * camera.forward[i],
+    ) as FourVector;
+  return {
+    ...camera,
+    right: combine(matrix[0], matrix[1], matrix[2]),
+    up: combine(matrix[3], matrix[4], matrix[5]),
+    forward: combine(-matrix[6], -matrix[7], -matrix[8]),
+  };
+}
+export function relativeRotation(base: number[], current: number[]) {
+  const result = Array.from({ length: 9 }, () => 0);
+  for (let column = 0; column < 3; column++)
+    for (let row = 0; row < 3; row++)
+      result[column * 3 + row] = [0, 1, 2].reduce(
+        (s, k) => s + base[row * 3 + k] * current[column * 3 + k],
+        0,
+      );
+  return result;
 }

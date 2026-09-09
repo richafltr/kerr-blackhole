@@ -1,5 +1,12 @@
 # interstellar: ad astra / Kerr Black Hole
 
+> **Separate physical-descent development version.** Branch `feature/physical-descent` starts from `f79b53a`, preserved as `baseline-submission-v1`. Production is unchanged. [New implementation, controls, physical assumptions and review gates](docs/PHYSICAL_DESCENT.md).
+>
+> This milestone adds a parallel-transported Kerr observer frame, shared optical/craft orientation, asynchronous full-sphere sky lighting, a live 3D cabin, propellant-limited roll control and local mechanical impact response. The approved narration and score remain unchanged. It is an exterior development checkpoint, not a claim of film-quality rendering or a validated black-hole interior.
+
+The following sections describe the submission baseline; the development changes and current checks are documented above.
+
+
 **Public simulation:** https://kerr-blackhole.vercel.app
 
 A first-person probe descent built around real Kerr light transport and timelike motion, with a playable local debris encounter and an explicitly speculative memory-space finale. The opening shows **Interstellar: Ad Astra**, **Play**, and **Skip Intro**. The original narrator and score accompany an animated preview of calculated falling-observer views.

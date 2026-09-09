@@ -1,6 +1,6 @@
 import { hamiltonian } from './kerr.ts';
 import { releaseProbe, stepFlight, type Flight } from './flight.ts';
-const VERSION = 'kerr-rk4-005-quarter-M-v2';
+const VERSION = 'kerr-gyro-rk4-005-quarter-M-v3';
 export const PATH_STEP = 0.25;
 const memory = new Map<string, Flight[]>();
 export function sampleFlightPath(path: Flight[], properTime: number) {
@@ -40,6 +40,9 @@ export async function loadFlightPath(
         stored.at(-1)?.complete &&
         stored.every(
           (f, i) =>
+            Array.isArray(f.gyro) &&
+            f.gyro.length === 3 &&
+            f.gyro.every((e) => e.length === 4 && e.every(Number.isFinite)) &&
             Array.isArray(f.state) &&
             f.state.length === 6 &&
             f.state.every(Number.isFinite) &&

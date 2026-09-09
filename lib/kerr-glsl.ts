@@ -59,7 +59,8 @@ export const transportFragment = `#version 300 es
 precision highp float;
 ${kerrGLSL}
 uniform vec2 resolution;
-uniform float roll;
+uniform float roll, projectionScale;
+uniform bool environmentMap;
 uniform vec3 cameraPosition;
 uniform vec4 observer, forwardBasis, rightBasis, upBasis;
 uniform sampler2D initialX,initialP;
@@ -71,7 +72,11 @@ void main(){
  else {
  vec2 q=(gl_FragCoord.xy-.5*resolution)/resolution.y*2.;
  q=.38*mat2(cos(roll),-sin(roll),sin(roll),cos(roll))*q;
- vec4 p=-observer+(forwardBasis+q.x*rightBasis+q.y*upBasis)/sqrt(1.+dot(q,q));
+ q *= projectionScale;
+ vec3 direction = normalize(vec3(q,1.));
+ if(environmentMap){vec2 a=(gl_FragCoord.xy/resolution-.5)*vec2(6.2831853,3.14159265);
+ direction=vec3(sin(a.x)*cos(a.y),sin(a.y),cos(a.x)*cos(a.y));}
+ vec4 p=-observer+direction.z*forwardBasis+direction.x*rightBasis+direction.y*upBasis;
  ray=Ray(cameraPosition,p.yzw,p.x);
  }
  Transport result=trace(ray);transportData=result.data;diagnosticData=result.checks;

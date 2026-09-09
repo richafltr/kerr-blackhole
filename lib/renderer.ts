@@ -1,3 +1,4 @@
+import { integrateSky, type SkyLight } from './sky-light.ts';
 import { makeCamera, isco, type Camera } from './camera.ts';
 import type { KerrState } from './kerr.ts';
 import { fullscreenVertex, transportFragment } from './kerr-glsl.ts';
@@ -12,6 +13,9 @@ export type View = {
   spin: number;
   camera?: Camera;
   moving?: boolean;
+  /** Column-major rotation from current display camera into the cached optical frame. */
+  orientation?: number[];
+  lightingCamera?: Camera;
 };
 export const defaultView: View = {
   inclination: 77,
@@ -53,6 +57,8 @@ export function createRenderer(canvas: HTMLCanvasElement) {
   const tu = locate(transport, [
     'resolution',
     'roll',
+    'projectionScale',
+    'environmentMap',
     'cameraPosition',
     'observer',
     'forwardBasis',
@@ -74,7 +80,13 @@ export function createRenderer(canvas: HTMLCanvasElement) {
     'transportMap',
     'previewMap',
   ]);
-  const du = locate(display, ['resolution', 'exposure', 'emission']);
+  const du = locate(display, [
+    'resolution',
+    'exposure',
+    'emission',
+    'projectionScale',
+    'orientation',
+  ]);
   const timer = gl.getExtension('EXT_disjoint_timer_query_webgl2');
   const pending: {
     query: WebGLQuery;
@@ -152,6 +164,14 @@ export function createRenderer(canvas: HTMLCanvasElement) {
       }
     }
   }
+  const skyTransport = target(gl, 32, 16),
+    skyEmission = target(gl, 32, 16);
+  const skyBuffer = gl.createBuffer()!;
+  let skyFence: WebGLSync | null = null,
+    lastSky = -Infinity;
+  let illumination: SkyLight | undefined;
+  const skyData = new Float32Array(32 * 16 * 4);
+  const identity = [1, 0, 0, 0, 1, 0, 0, 0, 1];
   function setTransport(view: View) {
     const camera =
       view.camera ?? makeCamera(view.distance, view.inclination, view.spin);
@@ -163,6 +183,8 @@ export function createRenderer(canvas: HTMLCanvasElement) {
     gl.uniform1i(tu.includeDisk, 1);
     gl.uniform1i(tu.initialX, 3);
     gl.uniform1i(tu.initialP, 4);
+    gl.uniform1i(tu.environmentMap, 0);
+    gl.uniform1f(tu.projectionScale, 1.3);
     gl.uniform1f(tu.roll, (view.roll * Math.PI) / 180);
     gl.uniform3fv(tu.cameraPosition, camera.position);
     gl.uniform4fv(tu.observer, camera.observer);
@@ -170,12 +192,57 @@ export function createRenderer(canvas: HTMLCanvasElement) {
     gl.uniform4fv(tu.rightBasis, camera.right);
     gl.uniform4fv(tu.upBasis, camera.up);
   }
+  function sampleIllumination(time: number, view: View) {
+    if (skyFence) {
+      const status = gl.clientWaitSync(skyFence, 0, 0);
+      if (status === gl.ALREADY_SIGNALED || status === gl.CONDITION_SATISFIED) {
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, skyBuffer);
+        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, skyData);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        illumination = integrateSky(skyData, 32, 16);
+        gl.deleteSync(skyFence);
+        skyFence = null;
+      } else if (status === gl.WAIT_FAILED) {
+        gl.deleteSync(skyFence);
+        skyFence = null;
+      }
+    }
+    if (skyFence || performance.now() - lastSky < 700) return;
+    lastSky = performance.now();
+    setTransport({ ...view, camera: view.lightingCamera ?? view.camera });
+    gl.uniform1i(tu.environmentMap, 1);
+    gl.uniform1f(tu.roll, 0);
+    gl.uniform2f(tu.resolution, 32, 16);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, skyTransport.fbo);
+    gl.viewport(0, 0, 32, 16);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, skyEmission.fbo);
+    gl.useProgram(shade);
+    bindTexture(0, skyTransport.tex);
+    bindTexture(1, skyTransport.tex);
+    gl.uniform1i(su.transportMap, 0);
+    gl.uniform1i(su.previewMap, 1);
+    gl.uniform2f(su.resolution, 32, 16);
+    gl.uniform1f(su.spin, view.spin);
+    gl.uniform1f(su.innerRadius, isco(view.spin));
+    gl.uniform1f(su.time, time);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // One bounded readback in flight. Poll its fence on later frames; never wait synchronously.
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, skyBuffer);
+    gl.bufferData(gl.PIXEL_PACK_BUFFER, skyData.byteLength, gl.STREAM_READ);
+    gl.readPixels(0, 0, 32, 16, gl.RGBA, gl.FLOAT, 0);
+    skyFence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    gl.flush();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
   function render(time: number, view: View): RenderStats {
     if (gl.isContextLost())
       throw new Error(
         'GPU context was lost. Reload to restore the simulation.',
       );
     poll();
+    sampleIllumination(time, view);
     const rect = canvas.getBoundingClientRect(),
       ratio = rect.width / Math.max(1, rect.height),
       longest = Math.max(rect.width, rect.height),
@@ -196,6 +263,8 @@ export function createRenderer(canvas: HTMLCanvasElement) {
             ...view.camera.position,
             ...view.camera.observer,
             ...view.camera.forward,
+            ...view.camera.right,
+            ...view.camera.up,
           ]
         : []),
     ].join('/');
@@ -318,6 +387,8 @@ export function createRenderer(canvas: HTMLCanvasElement) {
       gl.uniform1i(du.emission, 0);
       gl.uniform2f(du.resolution, w, h);
       gl.uniform1f(du.exposure, view.exposure);
+      gl.uniform1f(du.projectionScale, 1.3);
+      gl.uniformMatrix3fv(du.orientation, false, view.orientation ?? identity);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     });
     return stats;
@@ -380,7 +451,14 @@ export function createRenderer(canvas: HTMLCanvasElement) {
     render,
     diagnose,
     stats,
+    get illumination() {
+      return illumination;
+    },
     dispose() {
+      if (skyFence) gl.deleteSync(skyFence);
+      gl.deleteBuffer(skyBuffer);
+      removeTarget(gl, skyTransport);
+      removeTarget(gl, skyEmission);
       removeTarget(gl, low);
       removeTarget(gl, high);
       removeTarget(gl, hdr);

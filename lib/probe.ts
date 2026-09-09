@@ -1,3 +1,4 @@
+import { createPhysicalScene, type PhysicalFrame } from './physical-scene';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createVessels } from './vessels';
@@ -31,7 +32,8 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
   const fill = new THREE.DirectionalLight(0xc9d8de, 0.9);
   fill.position.set(8, 8, 20);
   scene.add(fill);
-  scene.add(new THREE.AmbientLight(0xb9b4a1, 0.45));
+  const ambient = new THREE.AmbientLight(0xb9b4a1, 0.45);
+  scene.add(ambient);
   const encounter = createEncounterScene(scene);
   const vessels = createVessels();
   scene.add(vessels.carrier);
@@ -39,6 +41,15 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
     detail = new THREE.Group();
   capsule.add(detail);
   scene.add(capsule);
+  const physical = createPhysicalScene(
+    scene,
+    camera,
+    capsule,
+    vessels.carrier,
+    key,
+    fill,
+    ambient,
+  );
   const capsuleMaterials = new Set([
     'blinn11SG',
     'blinn14SG',
@@ -84,6 +95,7 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
           new THREE.Box3().setFromObject(detail).getCenter(new THREE.Vector3()),
         )
         .multiplyScalar(-1);
+      physical.normalizeAsset();
       loaded = true;
       if (disposed) disposeAsset();
     })
@@ -93,6 +105,7 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
   let width = 0,
     height = 0;
   return {
+    prepare: physical.prepare,
     remember: (sky: HTMLCanvasElement, properSeconds: number) =>
       encounter.remember(sky, canvas, properSeconds),
     clearMemories: encounter.clearMemories,
@@ -101,6 +114,7 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
       separationM = 0,
       cinematic?: CinematicFrame,
       navigation?: Navigation,
+      physicalFrame?: PhysicalFrame,
     ) {
       if (assetError)
         throw new Error(
@@ -119,6 +133,16 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
         height = h;
       }
       renderer.clear();
+      if (
+        !cinematic &&
+        physicalFrame &&
+        physicalFrame.navigation?.kind !== 'memory'
+      ) {
+        physical.render(mode, physicalFrame, loaded);
+        renderer.render(scene, camera);
+        return;
+      }
+      physical.hide();
       if (
         navigation?.kind === 'memory' ||
         (mode !== 'beside' && mode !== 'wide')
@@ -169,6 +193,7 @@ export function createProbeRenderer(canvas: HTMLCanvasElement) {
     dispose() {
       disposed = true;
       disposeAsset();
+      physical.dispose();
       vessels.dispose();
       encounter.dispose();
       renderer.dispose();

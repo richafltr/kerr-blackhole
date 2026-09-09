@@ -1,3 +1,11 @@
+import {
+  liftCamera,
+  gyroDerivative,
+  shiftGyro,
+  orthonormalGyro,
+  gyroCamera,
+  type Gyro,
+} from './gyro.ts';
 import { makeCamera, observerCamera, type FourVector } from './camera.ts';
 import {
   inverseMetric,
@@ -9,6 +17,7 @@ import {
 } from './kerr.ts';
 export type Flight = {
   state: KerrState;
+  gyro: Gyro;
   pt: number;
   spin: number;
   properTime: number;
@@ -26,6 +35,7 @@ export function releaseProbe(
     p = camera.observer;
   return {
     state: [...camera.position, p[1], p[2], p[3]],
+    gyro: liftCamera(camera, spin),
     pt: p[0],
     spin,
     properTime: 0,
@@ -46,7 +56,8 @@ export function stepFlight(
   properDuration: number,
   maxStep = 0.05,
 ): Flight {
-  let { state, coordinateTime, properTime, radius, complete, residual } = f;
+  let { state, gyro, coordinateTime, properTime, radius, complete, residual } =
+    f;
   let remaining = properDuration;
   const limit = 1 + Math.sqrt(1 - f.spin * f.spin) + 0.3;
   while (remaining > 1e-10 && !complete) {
@@ -60,6 +71,16 @@ export function stepFlight(
       c = kerrDerivative(s3, f.pt, f.spin),
       s4 = shift(c, h),
       d = kerrDerivative(s4, f.pt, f.spin);
+    const ga = gyroDerivative(gyro, state, f.pt, f.spin),
+      gb = gyroDerivative(shiftGyro(gyro, ga, h / 2), s2, f.pt, f.spin),
+      gc = gyroDerivative(shiftGyro(gyro, gb, h / 2), s3, f.pt, f.spin),
+      gd = gyroDerivative(shiftGyro(gyro, gc, h), s4, f.pt, f.spin);
+    gyro = gyro.map((e, j) =>
+      e.map(
+        (v, i) =>
+          v + (h * (ga[j][i] + 2 * gb[j][i] + 2 * gc[j][i] + gd[j][i])) / 6,
+      ),
+    ) as Gyro;
     coordinateTime +=
       (h *
         (timeDerivative(state, f.pt, f.spin) +
@@ -84,6 +105,7 @@ export function stepFlight(
   return {
     ...f,
     state,
+    gyro: orthonormalGyro(gyro, state, f.pt, f.spin),
     coordinateTime,
     properTime,
     radius,
@@ -92,6 +114,10 @@ export function stepFlight(
   };
 }
 export function flightCamera(f: Flight) {
+  return gyroCamera(f.state, f.pt, f.spin, f.gyro);
+}
+// Retained reference for optical comparison; gameplay uses the carried frame.
+export function trackingFlightCamera(f: Flight) {
   const position = f.state.slice(0, 3) as Vector3,
     p = [f.pt, ...f.state.slice(3)];
   const inverse = inverseMetric(position, f.spin);

@@ -16,7 +16,13 @@ vec3 emissionAt(vec4 transport){
  if(transport.w>.5&&transport.w<1.5){
   float r=sqrt(max(.01,dot(transport.xy,transport.xy)-spin*spin)),azimuth=atan(transport.y,transport.x);
   float phase=azimuth-time/(pow(r,1.5)+spin)*6.;
-  float structure=.65+.30*noise(vec2(r*12.,sin(phase*8.)*2.))+ .15*noise(vec2(r*42.,sin(phase*21.)*4.));
+  // Periodic emission texture, differentially advected; an art-directed thin disk, not GRMHD.
+  vec2 orbit=vec2(cos(phase),sin(phase));
+  float macro=noise(orbit*(3.+r*.3)+vec2(r*.55,r*.19));
+  float filament=noise(orbit*18.+vec2(r*13.,r*1.5)+macro*2.);
+  float grain=noise(orbit*62.+vec2(r*48.,r*3.));
+  float structure=.24+.85*macro*macro+.65*filament*filament+.18*grain;
+  structure*=.6+.4*smoothstep(.12,.8,noise(orbit*7.+vec2(r*3.1,0.)));
   float temperature=17000.*pow(innerRadius/r,.75)*pow(max(.0001,1.-sqrt(innerRadius/r)),.25);
   radiance=blackbody(max(500.,temperature*transport.z))*structure*(1.-smoothstep(19.,22.,r));
  }else if(transport.w>1.5&&transport.w<2.5){
@@ -44,11 +50,16 @@ export const displayFragment = `#version 300 es
 precision highp float;
 uniform sampler2D emission;
 uniform vec2 resolution;
-uniform float exposure;
+uniform float exposure, projectionScale;
+uniform mat3 orientation;
 out vec4 color;
 vec3 bright(vec2 uv){vec3 c=texture(emission,uv).rgb;return c*smoothstep(.35,1.5,max(c.r,max(c.g,c.b)));}
 vec3 film(vec3 c){return clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),0.,1.);}
-void main(){vec2 uv=gl_FragCoord.xy/resolution;vec3 base=texture(emission,uv).rgb,glow=vec3(0.);
+void main(){vec2 screen=(gl_FragCoord.xy-.5*resolution)/resolution.y*2.;
+ vec3 ray=orientation*vec3(screen*.38,-1.);
+ vec2 uv=(ray.xy/max(.05,-ray.z))/(.38*projectionScale)*resolution.y/resolution*.5+.5;
+ if(ray.z>=0.||any(lessThan(uv,vec2(0.)))||any(greaterThan(uv,vec2(1.)))){color=vec4(0.,0.,0.,1.);return;}
+ vec3 base=texture(emission,uv).rgb,glow=vec3(0.);
  for(int i=0;i<12;i++){float a=float(i)*6.2831853/12.;vec2 d=vec2(cos(a),sin(a))/resolution;
  glow+=bright(uv+d*5.)*.5+bright(uv+d*15.)*.3+bright(uv+d*35.)*.2;}
  vec3 mapped=film(exposure*(base+.20*glow/12.));color=vec4(pow(mapped,vec3(1./2.2)),1.);}
